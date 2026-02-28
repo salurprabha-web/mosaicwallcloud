@@ -1,0 +1,132 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  engineType      = "wasm"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  role         String        @default("admin") // super_admin | admin
+  createdAt    DateTime      @default(now())
+  assignments  MosaicAdmin[]
+}
+
+// ── Mosaic / Event ────────────────────────────────────────────────────────────
+model Mosaic {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique   // used in URL: /admin/[slug]
+  description String?
+  status      String        @default("active") // active | archived
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  admins      MosaicAdmin[]
+  configs     Config[]
+  tiles       Tile[]
+  prizeCells  PrizeCell[]
+}
+
+model MosaicAdmin {
+  userId   String
+  mosaicId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mosaic   Mosaic @relation(fields: [mosaicId], references: [id], onDelete: Cascade)
+
+  @@id([userId, mosaicId])
+}
+
+// ── Mosaic Config (per mosaic) ────────────────────────────────────────────────
+model Config {
+  id             Int      @id @default(autoincrement())
+  mosaicId       String?
+  mosaic         Mosaic?  @relation(fields: [mosaicId], references: [id], onDelete: Cascade)
+  gridWidth      Int      @default(20)
+  gridHeight     Int      @default(20)
+  gapSize        Int      @default(2)
+  borderRadius   Int      @default(4)
+  bgImageUrl     String?
+  bgOpacity      Float    @default(0.5)
+  animationSpeed Float    @default(1.0)
+  entryAnimation String   @default("fade")
+  moderationOn   Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+}
+
+// ── Tile (per mosaic) ─────────────────────────────────────────────────────────
+model Tile {
+  id         String   @id @default(uuid())
+  mosaicId   String?
+  mosaic     Mosaic?  @relation(fields: [mosaicId], references: [id], onDelete: Cascade)
+  imageUrl   String
+  gridX      Int
+  gridY      Int
+  status     String   @default("pending")
+  uploader   String?
+  email      String?
+  createdAt  DateTime @default(now())
+}
+
+// ── Prize Cells (per mosaic) ──────────────────────────────────────────────────
+model PrizeCell {
+  id       Int     @id @default(autoincrement())
+  mosaicId String?
+  mosaic   Mosaic? @relation(fields: [mosaicId], references: [id], onDelete: Cascade)
+  gridX    Int
+  gridY    Int
+
+  @@unique([mosaicId, gridX, gridY])
+}
+
+// ── CMS: Site-wide settings ───────────────────────────────────────────────────
+model SiteSetting {
+  key       String   @id   // e.g. "site_name", "meta_description", "og_image", "ga_id"
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// ── CMS: Editable page sections ───────────────────────────────────────────────
+model PageSection {
+  id         String   @id @default(uuid())
+  page       String   // "home" | "features" | "about"
+  sectionKey String   // "hero" | "cta" | "how_it_works" | etc.
+  title      String?
+  subtitle   String?
+  body       String?
+  ctaText    String?
+  ctaUrl     String?
+  imageUrl   String?
+  badge      String?
+  order      Int      @default(0)
+  visible    Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([page, sectionKey])
+}
+
+// ── CMS: Blog posts ───────────────────────────────────────────────────────────
+model BlogPost {
+  id            String    @id @default(uuid())
+  slug          String    @unique
+  title         String
+  excerpt       String?
+  content       String    // markdown
+  coverImageUrl String?
+  author        String    @default("Admin")
+  published     Boolean   @default(false)
+  publishedAt   DateTime?
+  metaTitle     String?
+  metaDesc      String?
+  ogImage       String?
+  tags          String?   // comma-separated
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}

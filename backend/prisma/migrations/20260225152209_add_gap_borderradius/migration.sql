@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Config" ADD COLUMN     "borderRadius" INTEGER NOT NULL DEFAULT 4,
+ADD COLUMN     "gapSize" INTEGER NOT NULL DEFAULT 2;
