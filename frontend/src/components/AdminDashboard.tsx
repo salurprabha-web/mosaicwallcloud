@@ -115,6 +115,8 @@ export default function AdminDashboard({
     const wsUrl = backendAbsoluteUrl.replace('http', 'ws') + `/api/ws?mosaicId=${mosaicId}`;
     const sock = new WebSocket(wsUrl);
     setSocket(sock);
+    
+    const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
 
     const on = (type: string, handler: (data: any) => void) => {
       sock.addEventListener('message', (event) => {
