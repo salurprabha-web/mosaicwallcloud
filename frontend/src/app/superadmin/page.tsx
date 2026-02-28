@@ -12,7 +12,7 @@ import dynamic from 'next/dynamic';
 
 const WebsitePanel = dynamic(() => import('@/components/WebsitePanel'), { ssr: false });
 
-const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
 interface Mosaic {
   id: string; name: string; slug: string; description?: string;
@@ -69,7 +69,15 @@ export default function SuperAdminPage() {
   const [createAdminLoading, setCreateAdminLoading] = useState(false);
 
   const apiFetch = useCallback(async (path: string, opts?: RequestInit) => {
-    const res = await fetch(`${backend}${path}`, { credentials: 'include', ...opts });
+    const token = typeof window !== 'undefined' ? localStorage.getItem('mosaic_token') : null;
+    const res = await fetch(`${backend}${path}`, { 
+      ...opts,
+      headers: { 
+        ...opts?.headers,
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include' 
+    });
     if (res.status === 401 || res.status === 403) { router.push('/login'); throw new Error('Unauthorized'); }
     return res.json();
   }, [router]);
@@ -91,7 +99,10 @@ export default function SuperAdminPage() {
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const handleLogout = async () => {
-    await fetch(`${backend}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+    // Use apiFetch for logout, it handles token and credentials
+    await apiFetch('/api/auth/logout', { method: 'POST' });
+    localStorage.removeItem('mosaic_token');
+    document.cookie = "mosaic_jwt=; Path=/; Max-Age=0";
     router.push('/login');
   };
 

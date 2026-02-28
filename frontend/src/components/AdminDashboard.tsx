@@ -130,7 +130,10 @@ export default function AdminDashboard({
     sock.onopen = () => {
       setConnected(true);
       // Fetch initial tile stats from backend
-      fetch(`${backendUrl}/api/stats?mosaicId=${mosaicId}`)
+      let token = localStorage.getItem('mosaic_token');
+      fetch(`${backendUrl}/api/stats?mosaicId=${mosaicId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
         .then((r) => r.json())
         .then((data) => {
           if (typeof data.approved === 'number') setTotalApproved(data.approved);
@@ -149,7 +152,11 @@ export default function AdminDashboard({
         .catch(() => {});
       
       // Fetch Prize Cells via REST
-      fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/prize-cells`, { credentials: 'include' })
+      token = localStorage.getItem('mosaic_token');
+      fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/prize-cells`, { 
+        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include' 
+      })
         .then(r => r.json())
         .then(cells => {
           if (Array.isArray(cells)) {
@@ -203,6 +210,7 @@ export default function AdminDashboard({
     if (!file) return;
 
     const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+    const token = localStorage.getItem('mosaic_token');
     const formData = new FormData();
     formData.append('file', file);
     if (mosaicId) formData.append('mosaicId', mosaicId);
@@ -210,6 +218,7 @@ export default function AdminDashboard({
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/config/background`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
         credentials: 'include'
       });
@@ -234,9 +243,11 @@ export default function AdminDashboard({
     setFillMessage('');
     
     const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+    const token = localStorage.getItem('mosaic_token');
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/random-fill`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
       const data = await res.json();
@@ -260,11 +271,16 @@ export default function AdminDashboard({
     setBulkProgress({ done: 0, total: bulkFiles.length });
     setBulkError(null);
     const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+    const token = localStorage.getItem('mosaic_token');
     const formData = new FormData();
     if (mosaicId) formData.append('mosaicId', mosaicId);
     bulkFiles.forEach((f) => formData.append('images', f));
     try {
-      const res = await fetch(`${backendUrl}/api/bulk-upload`, { method: 'POST', body: formData });
+      const res = await fetch(`${backendUrl}/api/bulk-upload`, { 
+        method: 'POST', 
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData 
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setBulkProgress({ done: data.count, total: data.count });
@@ -284,10 +300,14 @@ export default function AdminDashboard({
     });
     
     const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+    const token = localStorage.getItem('mosaic_token');
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/prize-cells`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ cells }),
         credentials: 'include'
       });
@@ -315,10 +335,12 @@ export default function AdminDashboard({
     
     setClearStatus('clearing');
     const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+    const token = localStorage.getItem('mosaic_token');
     
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/tiles`, {
         method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
       
@@ -341,6 +363,7 @@ export default function AdminDashboard({
     setPushStatus('pushing');
     
     const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+    const token = localStorage.getItem('mosaic_token');
     const configPayload = {
       mosaicId,
       gridWidth: grid.width,
@@ -356,7 +379,10 @@ export default function AdminDashboard({
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/config`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(configPayload),
         credentials: 'include'
       });
@@ -444,8 +470,15 @@ export default function AdminDashboard({
         <div className={`px-3 pb-4 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
           <button
             onClick={async () => {
-              const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
-              await fetch(`${backend}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+              const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+              const token = localStorage.getItem('mosaic_token');
+              await fetch(`${backendUrl}/api/auth/logout`, { 
+                method: 'POST', 
+                headers: { 'Authorization': `Bearer ${token}` },
+                credentials: 'include' 
+              });
+              localStorage.removeItem('mosaic_token');
+              document.cookie = "mosaic_jwt=; Path=/; Max-Age=0";
               window.location.href = '/login';
             }}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all font-semibold text-sm text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 ${sidebarCollapsed ? 'justify-center w-10' : 'w-full'}`}
@@ -1086,8 +1119,9 @@ export default function AdminDashboard({
                     </p>
                     <button
                       onClick={() => {
-                        const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
-                        window.open(`${backend}/api/admin/export-csv?mosaicId=${mosaicId}`, '_blank');
+                        const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+                        const token = localStorage.getItem('mosaic_token');
+                        window.open(`${backend}/api/admin/export-csv?mosaicId=${mosaicId}&token=${token}`, '_blank');
                       }}
                       className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition-all"
                     >

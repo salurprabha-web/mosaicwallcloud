@@ -52,9 +52,12 @@ export default function UploadForm({ mosaicId }: { mosaicId?: string } = {}) {
       if (email.trim()) formData.append('email', email.trim());
       if (mosaicId) formData.append('mosaicId', mosaicId);
       const backendUrl =
-        typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8787");
+        process.env.NEXT_PUBLIC_BACKEND_URL || "https://mosaic-wall-backend.salurprabha.workers.dev";
+      const token = typeof window !== 'undefined' ? localStorage.getItem('mosaic_token') : null;
+      
       const res = await fetch(`${backendUrl}/api/upload`, {
         method: "POST",
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
       });
       if (!res.ok) throw new Error("Upload failed — please try again.");

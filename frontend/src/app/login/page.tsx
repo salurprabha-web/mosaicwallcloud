@@ -28,6 +28,14 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Login failed'); return; }
+
+      // 1. Store in localStorage for API calls
+      if (data.token) {
+        localStorage.setItem('mosaic_token', data.token);
+        // 2. Set client-side cookie for Next.js Middleware (frontend domain)
+        document.cookie = `mosaic_jwt=${data.token}; Path=/; Max-Age=86400; SameSite=Lax`;
+      }
+
       if (data.role === 'super_admin') {
         router.push('/superadmin');
       } else if (data.mosaicSlug) {
@@ -35,7 +43,7 @@ export default function LoginPage() {
       } else {
         setError('No mosaic assigned to your account. Contact your administrator.');
       }
-    } catch {
+    } catch (error) {
       setError('Cannot reach server. Make sure the backend is running.');
     } finally {
       setLoading(false);
