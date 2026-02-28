@@ -4,11 +4,11 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787'}/api/:path*`,
+        destination: `https://mosaic-wall-backend.salurprabha.workers.dev/api/:path*`,
       },
       {
         source: '/uploads/:path*',
-        destination: `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787'}/uploads/:path*`,
+        destination: `https://mosaic-wall-backend.salurprabha.workers.dev/uploads/:path*`,
       },
     ];
   },
