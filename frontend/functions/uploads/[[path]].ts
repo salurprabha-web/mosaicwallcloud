@@ -1,4 +1,4 @@
-export const onRequest: PagesFunction = async (context) => {
+export const onRequest = async (context: any) => {
   const { request } = context;
   const BACKEND_URL = 'https://mosaic-wall-backend.salurprabha.workers.dev';
   
