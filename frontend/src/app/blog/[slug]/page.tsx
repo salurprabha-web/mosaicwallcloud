@@ -26,8 +26,9 @@ async function getSettings() {
   try { const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 300 } }); return r.ok ? r.json() : {}; } catch { return {}; }
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  const post = await getPost(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await getPost(slug);
   if (!post) return { title: 'Post Not Found' };
   const title = post.metaTitle || post.title;
   const desc = post.metaDesc || post.excerpt || '';
@@ -55,8 +56,9 @@ function renderMarkdown(md: string): string {
     .split('\n\n').map(p => p.startsWith('<') ? p : `<p class="text-slate-400 leading-relaxed my-4">${p}</p>`).join('\n');
 }
 
-export default async function BlogPostPage({ params }: { params: { slug: string } }) {
-  const [post, settings] = await Promise.all([getPost(params.slug), getSettings()]);
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const [post, settings] = await Promise.all([getPost(slug), getSettings()]);
   if (!post) notFound();
 
   const jsonLd = {
