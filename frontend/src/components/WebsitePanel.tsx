@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Save, Plus, Trash2, Eye, EyeOff, ExternalLink, AlertCircle, Check, Loader2, Edit3, X, Globe, FileText, Layout } from 'lucide-react';
 
-const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
 type BlogPost = {
   id: string; slug: string; title: string; excerpt?: string; content: string;
@@ -22,7 +22,15 @@ type Tab = 'settings' | 'blog' | 'sections';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 async function apiFetch(path: string, opts?: RequestInit) {
-  const res = await fetch(`${backend}/api${path}`, { credentials: 'include', ...opts });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('mosaic_token') : null;
+  const res = await fetch(`${backend}/api${path}`, { 
+    ...opts,
+    headers: {
+      ...opts?.headers,
+      'Authorization': `Bearer ${token}`
+    },
+    credentials: 'include' 
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

@@ -35,7 +35,7 @@ export default function PhotoCardPage() {
   const [blending, setBlending] = useState(true);
   const [photoSizeIdx, setPhotoSizeIdx] = useState(2); // Default to Medium
   const [blendedUrls, setBlendedUrls] = useState<Record<string, string>>({});
-  const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+  const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
   
   const selectedSize = PHOTO_SIZES[photoSizeIdx];
 
@@ -46,7 +46,8 @@ export default function PhotoCardPage() {
       ? `${backend}/api/print/sticker-sheet?mosaicId=${mosaicId}`
       : `${backend}/api/print/sticker-sheet`;
 
-    fetch(url)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('mosaic_token') : null;
+    fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => r.json())
       .then(async data => {
         setTiles(data.tiles || []);

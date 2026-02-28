@@ -69,7 +69,7 @@ export default function StickerSheetPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sizeIdx, setSizeIdx] = useState(1); // default 7cm
-  const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+  const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
   const selected = STICKER_SIZES[sizeIdx];
 
@@ -80,7 +80,8 @@ export default function StickerSheetPage() {
       ? `${backend}/api/print/sticker-sheet?mosaicId=${mosaicId}`
       : `${backend}/api/print/sticker-sheet`;
 
-    fetch(url)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('mosaic_token') : null;
+    fetch(url, { headers: { 'Authorization': `Bearer ${token}` } })
       .then(r => r.json())
       .then(data => {
         setTiles(data.tiles || []);

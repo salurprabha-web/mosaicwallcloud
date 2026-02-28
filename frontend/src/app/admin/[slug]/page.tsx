@@ -24,12 +24,16 @@ export default function AdminSlugPage() {
   const [mosaicId, setMosaicId] = useState<string | null>(null);
   const [mosaicName, setMosaicName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
+  const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
   useEffect(() => {
     if (!slug) return;
+    const token = localStorage.getItem('mosaic_token');
     // Verify the mosaic exists and get its ID
-    fetch(`${backend}/api/superadmin/mosaics`, { credentials: 'include' })
+    fetch(`${backend}/api/superadmin/mosaics`, { 
+      headers: { 'Authorization': `Bearer ${token}` },
+      credentials: 'include' 
+    })
       .then(r => {
         if (r.status === 401 || r.status === 403) { router.push('/login'); return null; }
         return r.json();

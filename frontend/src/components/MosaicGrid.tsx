@@ -236,7 +236,7 @@ export default function MosaicGrid({ mosaicId, mosaicSlug = 'default' }: { mosai
   }, [queue, spotlightId, processQueue]);
 
   useEffect(() => {
-    const backendAbsoluteUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const backendAbsoluteUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const wsUrl = backendAbsoluteUrl.replace('http', 'ws') + `/api/ws?mosaicId=${mosaicId}`;
     const sock = new WebSocket(wsUrl);
 
