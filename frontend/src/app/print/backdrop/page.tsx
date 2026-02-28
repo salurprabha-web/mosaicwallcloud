@@ -15,7 +15,7 @@ export default function BackdropPage() {
   const [cfg, setCfg] = useState<BackdropConfig>({});
   const [loading, setLoading] = useState(true);
   const [highlight, setHighlight] = useState<string | null>(null);
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+  const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

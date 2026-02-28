@@ -13,7 +13,7 @@ export default function UploadSlugPage() {
   const [mosaicId, setMosaicId] = useState<string | null>(null);
   const [mosaicName, setMosaicName] = useState('Mosaic Wall');
   const [error, setError] = useState<string | null>(null);
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+  const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
 
   useEffect(() => {
     if (!slug) return;

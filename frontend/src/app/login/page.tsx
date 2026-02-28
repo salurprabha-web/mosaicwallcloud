@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+  const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

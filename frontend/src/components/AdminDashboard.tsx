@@ -111,8 +111,8 @@ export default function AdminDashboard({
   });
 
   useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
-    const wsUrl = backendUrl.replace('http', 'ws') + `/api/ws?mosaicId=${mosaicId}`;
+    const backendAbsoluteUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const wsUrl = backendAbsoluteUrl.replace('http', 'ws') + `/api/ws?mosaicId=${mosaicId}`;
     const sock = new WebSocket(wsUrl);
     setSocket(sock);
 
@@ -200,7 +200,7 @@ export default function AdminDashboard({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
     const formData = new FormData();
     formData.append('file', file);
     if (mosaicId) formData.append('mosaicId', mosaicId);
@@ -231,7 +231,7 @@ export default function AdminDashboard({
     setFillStatus('filling');
     setFillMessage('');
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/random-fill`, {
         method: 'POST',
@@ -257,7 +257,7 @@ export default function AdminDashboard({
     if (bulkFiles.length === 0) return;
     setBulkProgress({ done: 0, total: bulkFiles.length });
     setBulkError(null);
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
     const formData = new FormData();
     if (mosaicId) formData.append('mosaicId', mosaicId);
     bulkFiles.forEach((f) => formData.append('images', f));
@@ -281,7 +281,7 @@ export default function AdminDashboard({
       return { x, y };
     });
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/prize-cells`, {
         method: 'POST',
@@ -312,7 +312,7 @@ export default function AdminDashboard({
     if (!window.confirm('Are you sure you want to clear the entire mosaic? This will delete all guest photos permanently.')) return;
     
     setClearStatus('clearing');
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
     
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/tiles`, {
@@ -338,7 +338,7 @@ export default function AdminDashboard({
     if (pushStatus === 'pushing') return;
     setPushStatus('pushing');
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
     const configPayload = {
       mosaicId,
       gridWidth: grid.width,
@@ -442,7 +442,7 @@ export default function AdminDashboard({
         <div className={`px-3 pb-4 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
           <button
             onClick={async () => {
-              const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+              const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
               await fetch(`${backend}/api/auth/logout`, { method: 'POST', credentials: 'include' });
               window.location.href = '/login';
             }}
@@ -1084,7 +1084,7 @@ export default function AdminDashboard({
                     </p>
                     <button
                       onClick={() => {
-                        const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+                        const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
                         window.open(`${backend}/api/admin/export-csv?mosaicId=${mosaicId}`, '_blank');
                       }}
                       className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition-all"

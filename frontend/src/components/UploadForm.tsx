@@ -52,7 +52,7 @@ export default function UploadForm({ mosaicId }: { mosaicId?: string } = {}) {
       if (email.trim()) formData.append('email', email.trim());
       if (mosaicId) formData.append('mosaicId', mosaicId);
       const backendUrl =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8787";
+        typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8787");
       const res = await fetch(`${backendUrl}/api/upload`, {
         method: "POST",
         body: formData,

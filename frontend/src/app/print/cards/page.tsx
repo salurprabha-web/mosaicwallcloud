@@ -35,7 +35,7 @@ export default function PhotoCardPage() {
   const [blending, setBlending] = useState(true);
   const [photoSizeIdx, setPhotoSizeIdx] = useState(2); // Default to Medium
   const [blendedUrls, setBlendedUrls] = useState<Record<string, string>>({});
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+  const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
   
   const selectedSize = PHOTO_SIZES[photoSizeIdx];
 

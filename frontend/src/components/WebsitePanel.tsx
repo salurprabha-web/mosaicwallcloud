@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Save, Plus, Trash2, Eye, EyeOff, ExternalLink, AlertCircle, Check, Loader2, Edit3, X, Globe, FileText, Layout } from 'lucide-react';
 
-const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
 
 type BlogPost = {
   id: string; slug: string; title: string; excerpt?: string; content: string;

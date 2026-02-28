@@ -12,7 +12,7 @@ import dynamic from 'next/dynamic';
 
 const WebsitePanel = dynamic(() => import('@/components/WebsitePanel'), { ssr: false });
 
-const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
+const backend = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787');
 
 interface Mosaic {
   id: string; name: string; slug: string; description?: string;
