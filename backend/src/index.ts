@@ -467,6 +467,7 @@ app.get('/api/site-settings', async (c) => {
     const settings = await prisma.siteSetting.findMany();
     const map: Record<string, string> = {};
     settings.forEach((s: any) => { map[s.key] = s.value; });
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return c.json(map);
   } catch (err) {
     return c.json({ error: 'Failed to fetch settings' }, 500);
@@ -481,6 +482,7 @@ app.get('/api/blog', async (c) => {
       select: { id: true, slug: true, title: true, excerpt: true, coverImageUrl: true, author: true, publishedAt: true, tags: true },
       orderBy: { publishedAt: 'desc' },
     });
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return c.json(posts);
   } catch (err) {
     return c.json({ error: 'Failed to fetch posts' }, 500);
@@ -493,6 +495,7 @@ app.get('/api/blog/:slug', async (c) => {
   try {
     const post = await prisma.blogPost.findUnique({ where: { slug } });
     if (!post || !post.published) return c.json({ error: 'Post not found' }, 404);
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return c.json(post);
   } catch (err) {
     return c.json({ error: 'Failed to fetch post' }, 500);
@@ -507,6 +510,7 @@ app.get('/api/page-sections/:page', async (c) => {
       where: { page, visible: true },
       orderBy: { order: 'asc' },
     });
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return c.json(sections);
   } catch (err) {
     return c.json({ error: 'Failed to fetch sections' }, 500);
