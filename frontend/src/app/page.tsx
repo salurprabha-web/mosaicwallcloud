@@ -1,4 +1,6 @@
-import type { Metadata } from 'next';
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -9,43 +11,6 @@ const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
 type Section = { id: string; sectionKey: string; title?: string; subtitle?: string; body?: string; ctaText?: string; ctaUrl?: string; badge?: string };
 type Settings = Record<string, string>;
 type Post = { id: string; slug: string; title: string; excerpt?: string; coverImageUrl?: string; author: string; publishedAt?: string; tags?: string };
-
-async function getSections(): Promise<Section[]> {
-  try { 
-    const r = await fetch(`${backendUrl}/api/page-sections/home`, { 
-      next: { revalidate: 0 },
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    }); 
-    if (!r.ok) return [{ id: 'error', sectionKey: 'hero', title: `Backend Err: ${r.status}`, subtitle: `URL: ${backendUrl}/api/page-sections/home` }];
-    return r.json(); 
-  } catch (e: any) { 
-    return [{ id: 'error', sectionKey: 'hero', title: 'Fetch Fail', subtitle: e.message }]; 
-  }
-}
-async function getSettings(): Promise<Settings> {
-  try { 
-    const r = await fetch(`${backendUrl}/api/site-settings`, { 
-      next: { revalidate: 0 },
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    }); 
-    if (!r.ok) return { site_name: `SET ERR: ${r.status}` };
-    return r.json(); 
-  } catch (e: any) { 
-    return { site_name: `SET FAIL: ${e.message.slice(0, 10)}` }; 
-  }
-}
-async function getRecentPosts(): Promise<Post[]> {
-  try { const r = await fetch(`${backendUrl}/api/blog`, { next: { revalidate: 0 } }); return r.ok ? r.json() : []; } catch { return []; }
-}
-
-export async function generateMetadata(): Promise<Metadata> {
-  const s = await getSettings();
-  return {
-    title: s.site_tagline || 'Turn Any Event Into A Living Mosaic',
-    description: s.meta_description || 'Mosaic Wall creates stunning real-time digital photo mosaics for any event.',
-    alternates: { canonical: '/' },
-  };
-}
 
 const EVENT_TYPES = [
   { icon: '💍', label: 'Weddings', desc: 'Create a living memory wall where every guest becomes part of the couple\'s story.' },
@@ -62,8 +27,33 @@ const TESTIMONIALS = [
   { quote: 'The physical mosaic backdrop is now framed in our office. A keepsake that reminds us of an incredible day.', name: 'Sunita Reddy', event: 'Product Launch, Hyderabad' },
 ];
 
-export default async function HomePage() {
-  const [sections, settings, posts] = await Promise.all([getSections(), getSettings(), getRecentPosts()]);
+export default function HomePage() {
+  const [sections, setSections] = useState<Section[]>([]);
+  const [settings, setSettings] = useState<Settings>({});
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [secRes, setRes, postRes] = await Promise.all([
+          fetch(`${backendUrl}/api/page-sections/home?t=${Date.now()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }),
+          fetch(`${backendUrl}/api/site-settings?t=${Date.now()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }),
+          fetch(`${backendUrl}/api/blog?t=${Date.now()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+        ]);
+
+        if (secRes.ok) setSections(await secRes.json());
+        if (setRes.ok) setSettings(await setRes.json());
+        if (postRes.ok) setPosts(await postRes.json());
+      } catch (err) {
+        console.error("Fetch failed", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
   const byKey = (key: string) => sections.find(s => s.sectionKey === key);
   const hero = byKey('hero');
   const digital = byKey('digital_mosaic');
@@ -78,6 +68,14 @@ export default async function HomePage() {
 
   const waNumber = settings.whatsapp ? `91${settings.whatsapp.replace(/\D/g, '')}` : null;
   const waMessage = encodeURIComponent("Hi! I'm interested in Mosaic Wall for my event. Can you share more details?");
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#080c14] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <>
