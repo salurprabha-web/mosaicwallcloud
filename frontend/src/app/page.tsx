@@ -11,10 +11,22 @@ type Settings = Record<string, string>;
 type Post = { id: string; slug: string; title: string; excerpt?: string; coverImageUrl?: string; author: string; publishedAt?: string; tags?: string };
 
 async function getSections(): Promise<Section[]> {
-  try { const r = await fetch(`${backendUrl}/api/page-sections/home`, { next: { revalidate: 0 } }); return r.ok ? r.json() : []; } catch { return []; }
+  try { 
+    const r = await fetch(`${backendUrl}/api/page-sections/home`, { next: { revalidate: 0 } }); 
+    if (!r.ok) return [{ id: 'error', sectionKey: 'hero', title: `Backend Error: ${r.status}`, subtitle: `Target: ${backendUrl}` }];
+    return r.json(); 
+  } catch (e: any) { 
+    return [{ id: 'error', sectionKey: 'hero', title: 'Connection Failed', subtitle: e.message }]; 
+  }
 }
 async function getSettings(): Promise<Settings> {
-  try { const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } }); return r.ok ? r.json() : {}; } catch { return {}; }
+  try { 
+    const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } }); 
+    if (!r.ok) return { site_name: `API ERR: ${r.status}` };
+    return r.json(); 
+  } catch (e: any) { 
+    return { site_name: `API FAIL: ${e.message.slice(0, 10)}` }; 
+  }
 }
 async function getRecentPosts(): Promise<Post[]> {
   try { const r = await fetch(`${backendUrl}/api/blog`, { next: { revalidate: 0 } }); return r.ok ? r.json() : []; } catch { return []; }
