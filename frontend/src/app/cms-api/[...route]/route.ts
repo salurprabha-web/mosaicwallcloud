@@ -33,15 +33,20 @@ async function proxyRequest(req: NextRequest, route: string[]) {
     const url = new URL(req.url);
     const targetUrl = `${BACKEND_URL}${backendPath}${url.search}`;
 
-    const headers = new Headers(req.headers);
-    headers.delete('host');
+    const outgoingHeaders = new Headers();
+    const safeHeaders = ['authorization', 'content-type', 'user-agent', 'accept'];
+    for (const h of safeHeaders) {
+      if (req.headers.has(h)) {
+        outgoingHeaders.set(h, req.headers.get(h)!);
+      }
+    }
 
     const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
     const body = hasBody ? req.body : null;
 
     const response = await fetch(targetUrl, {
       method: req.method,
-      headers,
+      headers: outgoingHeaders,
       body,
       // @ts-ignore
       duplex: hasBody ? 'half' : undefined,
