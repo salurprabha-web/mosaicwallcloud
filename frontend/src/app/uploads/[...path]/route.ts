@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-const BACKEND_URL = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;

@@ -12,7 +12,7 @@ import dynamic from 'next/dynamic';
 
 const WebsitePanel = dynamic(() => import('@/components/WebsitePanel'), { ssr: false });
 
-const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
 interface Mosaic {
   id: string; name: string; slug: string; description?: string;

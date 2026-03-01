@@ -8,7 +8,7 @@ export const authMiddleware = async (c: Context, next: Next) => {
     let token = '';
 
     // Extract token from cookie
-    const tokenCookie = cookies.split(';').find((cookie) => cookie.trim().startsWith('token='));
+    const tokenCookie = cookies.split(';').find((cookie) => cookie.trim().startsWith('mosaic_jwt='));
     if (tokenCookie) {
       token = tokenCookie.split('=')[1];
     }

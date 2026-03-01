@@ -69,7 +69,7 @@ export default function StickerSheetPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sizeIdx, setSizeIdx] = useState(1); // default 7cm
-  const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
   const selected = STICKER_SIZES[sizeIdx];
 

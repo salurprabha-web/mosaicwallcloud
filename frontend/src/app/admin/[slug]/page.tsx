@@ -24,7 +24,7 @@ export default function AdminSlugPage() {
   const [mosaicId, setMosaicId] = useState<string | null>(null);
   const [mosaicName, setMosaicName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 
   useEffect(() => {
     if (!slug) return;

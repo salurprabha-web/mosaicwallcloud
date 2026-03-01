@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

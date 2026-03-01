@@ -75,13 +75,13 @@ app.post('/api/auth/login', async (c) => {
     mosaicSlug = assignment?.mosaic?.slug ?? null;
   }
 
-  // Set cookie via header since Hono's setCookie can be finicky with sameSite sometimes
-  c.header('Set-Cookie', `token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
-  return c.json({ success: true, role: user.role, name: user.name, mosaicSlug });
+  // Set cookie with the name expected by middleware
+  c.header('Set-Cookie', `mosaic_jwt=${token}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=86400`);
+  return c.json({ success: true, token, role: user.role, name: user.name, mosaicSlug });
 });
 
 app.post('/api/auth/logout', (c) => {
-  c.header('Set-Cookie', `token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  c.header('Set-Cookie', `mosaic_jwt=; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=0`);
   return c.json({ success: true });
 });
 
