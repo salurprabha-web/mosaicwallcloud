@@ -13,7 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const res = await fetch(`${backendUrl}/api/blog`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${backendUrl}/api/blog`, { next: { revalidate: 0 } });
     if (res.ok) {
       const posts: { slug: string; publishedAt: string }[] = await res.json();
       const blogPages: MetadataRoute.Sitemap = posts.map(p => ({

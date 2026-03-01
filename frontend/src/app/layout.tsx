@@ -8,7 +8,7 @@ const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-b
 
 async function getSiteSettings(): Promise<Record<string, string>> {
   try {
-    const res = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 300 } });
+    const res = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } });
     if (!res.ok) return {};
     return res.json();
   } catch { return {}; }

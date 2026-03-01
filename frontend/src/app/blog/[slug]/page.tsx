@@ -16,14 +16,14 @@ type Post = {
 
 async function getPost(slug: string): Promise<Post | null> {
   try {
-    const r = await fetch(`${backendUrl}/api/blog/${slug}`, { next: { revalidate: 60 } });
+    const r = await fetch(`${backendUrl}/api/blog/${slug}`, { next: { revalidate: 0 } });
     if (!r.ok) return null;
     return r.json();
   } catch { return null; }
 }
 
 async function getSettings() {
-  try { const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 300 } }); return r.ok ? r.json() : {}; } catch { return {}; }
+  try { const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } }); return r.ok ? r.json() : {}; } catch { return {}; }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {

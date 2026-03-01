@@ -7,13 +7,13 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
 async function getSettings() {
-  try { const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 300 } }); return r.ok ? r.json() : {}; } catch { return {}; }
+  try { const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } }); return r.ok ? r.json() : {}; } catch { return {}; }
 }
 
 type Post = { id: string; slug: string; title: string; excerpt?: string; coverImageUrl?: string; author: string; publishedAt?: string; tags?: string };
 
 async function getPosts(): Promise<Post[]> {
-  try { const r = await fetch(`${backendUrl}/api/blog`, { next: { revalidate: 60 } }); return r.ok ? r.json() : []; } catch { return []; }
+  try { const r = await fetch(`${backendUrl}/api/blog`, { next: { revalidate: 0 } }); return r.ok ? r.json() : []; } catch { return []; }
 }
 
 export const metadata: Metadata = {

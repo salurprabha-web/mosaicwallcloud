@@ -2,9 +2,6 @@ const fs = require('fs');
 const path = require('path');
 
 const targetDir = 'c:\\Users\\User\\Desktop\\projects\\mosaic-wall\\frontend\\src';
-const oldFallback = "'http://localhost:3001'";
-const oldFallbackDouble = '"http://localhost:3001"';
-const productionUrl = "'https://mosaic-wall-backend.salurprabha.workers.dev'";
 
 function walk(dir) {
     const files = fs.readdirSync(dir);
@@ -16,8 +13,9 @@ function walk(dir) {
             let content = fs.readFileSync(fullPath, 'utf8');
             let changed = false;
             
-            if (content.includes(oldFallback) || content.includes(oldFallbackDouble)) {
-                content = content.split(oldFallback).join(productionUrl).split(oldFallbackDouble).join(productionUrl);
+            if (content.includes('revalidate:')) {
+                // Replace any revalidate: X with revalidate: 0
+                content = content.replace(/revalidate: \d+/g, 'revalidate: 0');
                 changed = true;
             }
             

@@ -11,13 +11,13 @@ type Settings = Record<string, string>;
 type Post = { id: string; slug: string; title: string; excerpt?: string; coverImageUrl?: string; author: string; publishedAt?: string; tags?: string };
 
 async function getSections(): Promise<Section[]> {
-  try { const r = await fetch(`${backendUrl}/api/page-sections/home`, { cache: 'no-store' }); return r.ok ? r.json() : []; } catch { return []; }
+  try { const r = await fetch(`${backendUrl}/api/page-sections/home`, { next: { revalidate: 0 } }); return r.ok ? r.json() : []; } catch { return []; }
 }
 async function getSettings(): Promise<Settings> {
-  try { const r = await fetch(`${backendUrl}/api/site-settings`, { cache: 'no-store' }); return r.ok ? r.json() : {}; } catch { return {}; }
+  try { const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } }); return r.ok ? r.json() : {}; } catch { return {}; }
 }
 async function getRecentPosts(): Promise<Post[]> {
-  try { const r = await fetch(`${backendUrl}/api/blog`, { cache: 'no-store' }); return r.ok ? r.json() : []; } catch { return []; }
+  try { const r = await fetch(`${backendUrl}/api/blog`, { next: { revalidate: 0 } }); return r.ok ? r.json() : []; } catch { return []; }
 }
 
 export async function generateMetadata(): Promise<Metadata> {
