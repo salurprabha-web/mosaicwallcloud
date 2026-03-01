@@ -6,7 +6,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
-const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+const backendUrl = '/cms-api';
 
 type Section = { id: string; sectionKey: string; title?: string; subtitle?: string; body?: string; ctaText?: string; ctaUrl?: string; badge?: string };
 type Settings = Record<string, string>;
@@ -37,9 +37,9 @@ export default function HomePage() {
     async function loadData() {
       try {
         const [secRes, setRes, postRes] = await Promise.all([
-          fetch(`${backendUrl}/api/page-sections/home?t=${Date.now()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }),
-          fetch(`${backendUrl}/api/site-settings?t=${Date.now()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } }),
-          fetch(`${backendUrl}/api/blog?t=${Date.now()}`, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+          fetch(`${backendUrl}/page-sections/home?t=${Date.now()}`),
+          fetch(`${backendUrl}/site-settings?t=${Date.now()}`),
+          fetch(`${backendUrl}/blog?t=${Date.now()}`)
         ]);
 
         if (secRes.ok) setSections(await secRes.json());
