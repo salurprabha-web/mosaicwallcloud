@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import WhatsAppButton from '@/components/WhatsAppButton';
 
-const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
 type Section = { id: string; sectionKey: string; title?: string; subtitle?: string; body?: string; ctaText?: string; ctaUrl?: string; badge?: string };
 type Settings = Record<string, string>;

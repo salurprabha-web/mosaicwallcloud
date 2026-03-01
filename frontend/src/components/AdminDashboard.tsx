@@ -111,12 +111,12 @@ export default function AdminDashboard({
   });
 
   useEffect(() => {
-    const backendAbsoluteUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendAbsoluteUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const wsUrl = backendAbsoluteUrl.replace('http', 'ws') + `/api/ws?mosaicId=${mosaicId}`;
     const sock = new WebSocket(wsUrl);
     setSocket(sock);
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
     const on = (type: string, handler: (data: any) => void) => {
       sock.addEventListener('message', (event) => {
@@ -209,7 +209,7 @@ export default function AdminDashboard({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const token = localStorage.getItem('mosaic_token');
     const formData = new FormData();
     formData.append('file', file);
@@ -242,7 +242,7 @@ export default function AdminDashboard({
     setFillStatus('filling');
     setFillMessage('');
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const token = localStorage.getItem('mosaic_token');
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/random-fill`, {
@@ -270,7 +270,7 @@ export default function AdminDashboard({
     if (bulkFiles.length === 0) return;
     setBulkProgress({ done: 0, total: bulkFiles.length });
     setBulkError(null);
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const token = localStorage.getItem('mosaic_token');
     const formData = new FormData();
     if (mosaicId) formData.append('mosaicId', mosaicId);
@@ -299,7 +299,7 @@ export default function AdminDashboard({
       return { x, y };
     });
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const token = localStorage.getItem('mosaic_token');
     try {
       const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/prize-cells`, {
@@ -334,7 +334,7 @@ export default function AdminDashboard({
     if (!window.confirm('Are you sure you want to clear the entire mosaic? This will delete all guest photos permanently.')) return;
     
     setClearStatus('clearing');
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const token = localStorage.getItem('mosaic_token');
     
     try {
@@ -362,7 +362,7 @@ export default function AdminDashboard({
     if (pushStatus === 'pushing') return;
     setPushStatus('pushing');
     
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+    const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
     const token = localStorage.getItem('mosaic_token');
     const configPayload = {
       mosaicId,
@@ -470,7 +470,7 @@ export default function AdminDashboard({
         <div className={`px-3 pb-4 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
           <button
             onClick={async () => {
-              const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+              const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
               const token = localStorage.getItem('mosaic_token');
               await fetch(`${backendUrl}/api/auth/logout`, { 
                 method: 'POST', 
@@ -1119,7 +1119,7 @@ export default function AdminDashboard({
                     </p>
                     <button
                       onClick={() => {
-                        const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
+                        const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
                         const token = localStorage.getItem('mosaic_token');
                         window.open(`${backend}/api/admin/export-csv?mosaicId=${mosaicId}&token=${token}`, '_blank');
                       }}

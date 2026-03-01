@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const targetDir = 'c:\\Users\\User\\Desktop\\projects\\mosaic-wall\\frontend\\src';
+const verifiedUrl = "'https://mosaic-wall-backend.salurprabha.workers.dev'";
 
 function walk(dir) {
     const files = fs.readdirSync(dir);
@@ -13,9 +14,16 @@ function walk(dir) {
             let content = fs.readFileSync(fullPath, 'utf8');
             let changed = false;
             
-            if (content.includes('revalidate:')) {
-                // Replace any revalidate: X with revalidate: 0
-                content = content.replace(/revalidate: \d+/g, 'revalidate: 0');
+            // Look for patterns like:
+            // const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '...';
+            // const backend = process.env.NEXT_PUBLIC_BACKEND_URL || '...';
+            // const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '...';
+            
+            const regex = /process\.env\.NEXT_PUBLIC_BACKEND_URL\s*\|\|\s*'[^']*'/g;
+            const regexDouble = /process\.env\.NEXT_PUBLIC_BACKEND_URL\s*\|\|\s*"[^"]*"/g;
+            
+            if (regex.test(content) || regexDouble.test(content)) {
+                content = content.replace(regex, verifiedUrl).replace(regexDouble, verifiedUrl);
                 changed = true;
             }
             
