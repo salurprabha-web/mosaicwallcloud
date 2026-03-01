@@ -37,9 +37,9 @@ export default function HomePage() {
     async function loadData() {
       try {
         const [secRes, setRes, postRes] = await Promise.all([
-          fetch(`${backendUrl}/page-sections/home?t=${Date.now()}`),
-          fetch(`${backendUrl}/site-settings?t=${Date.now()}`),
-          fetch(`${backendUrl}/blog?t=${Date.now()}`)
+          fetch(`${backendUrl}/api/page-sections/home?t=${Date.now()}`),
+          fetch(`${backendUrl}/api/site-settings?t=${Date.now()}`),
+          fetch(`${backendUrl}/api/blog?t=${Date.now()}`)
         ]);
 
         if (secRes.ok) setSections(await secRes.json());
