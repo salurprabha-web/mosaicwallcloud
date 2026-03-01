@@ -12,20 +12,26 @@ type Post = { id: string; slug: string; title: string; excerpt?: string; coverIm
 
 async function getSections(): Promise<Section[]> {
   try { 
-    const r = await fetch(`${backendUrl}/api/page-sections/home`, { next: { revalidate: 0 } }); 
-    if (!r.ok) return [{ id: 'error', sectionKey: 'hero', title: `Backend Error: ${r.status}`, subtitle: `Target: ${backendUrl}` }];
+    const r = await fetch(`${backendUrl}/api/page-sections/home`, { 
+      next: { revalidate: 0 },
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    }); 
+    if (!r.ok) return [{ id: 'error', sectionKey: 'hero', title: `Backend Err: ${r.status}`, subtitle: `URL: ${backendUrl}/api/page-sections/home` }];
     return r.json(); 
   } catch (e: any) { 
-    return [{ id: 'error', sectionKey: 'hero', title: 'Connection Failed', subtitle: e.message }]; 
+    return [{ id: 'error', sectionKey: 'hero', title: 'Fetch Fail', subtitle: e.message }]; 
   }
 }
 async function getSettings(): Promise<Settings> {
   try { 
-    const r = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } }); 
-    if (!r.ok) return { site_name: `API ERR: ${r.status}` };
+    const r = await fetch(`${backendUrl}/api/site-settings`, { 
+      next: { revalidate: 0 },
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    }); 
+    if (!r.ok) return { site_name: `SET ERR: ${r.status}` };
     return r.json(); 
   } catch (e: any) { 
-    return { site_name: `API FAIL: ${e.message.slice(0, 10)}` }; 
+    return { site_name: `SET FAIL: ${e.message.slice(0, 10)}` }; 
   }
 }
 async function getRecentPosts(): Promise<Post[]> {
