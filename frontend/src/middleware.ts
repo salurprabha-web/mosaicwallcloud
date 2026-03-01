@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/upload', '/display', '/api/auth', '/about', '/features', '/pricing', '/faq', '/blog', '/contact'];
+const PUBLIC_PATHS = ['/login', '/upload', '/display', '/api/auth', '/about', '/features', '/pricing', '/faq', '/blog', '/contact', '/cms-api'];
 
 function isPublic(pathname: string) {
   if (pathname === '/') return true;
@@ -40,5 +40,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|uploads).*)'],
+  matcher: ['/((?!api|cms-api|_next/static|_next/image|favicon.ico|uploads).*)'],
 };
