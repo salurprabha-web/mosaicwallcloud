@@ -4,7 +4,7 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
-const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
 async function getSiteSettings(): Promise<Record<string, string>> {
   try {

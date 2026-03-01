@@ -35,7 +35,7 @@ export default function PhotoCardPage() {
   const [blending, setBlending] = useState(true);
   const [photoSizeIdx, setPhotoSizeIdx] = useState(2); // Default to Medium
   const [blendedUrls, setBlendedUrls] = useState<Record<string, string>>({});
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
   
   const selectedSize = PHOTO_SIZES[photoSizeIdx];
 

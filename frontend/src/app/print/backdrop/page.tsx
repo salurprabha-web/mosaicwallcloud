@@ -15,7 +15,7 @@ export default function BackdropPage() {
   const [cfg, setCfg] = useState<BackdropConfig>({});
   const [loading, setLoading] = useState(true);
   const [highlight, setHighlight] = useState<string | null>(null);
-  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
