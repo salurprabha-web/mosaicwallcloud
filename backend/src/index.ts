@@ -16,6 +16,7 @@ export type Bindings = {
   MOSAIC_ROOM: DurableObjectNamespace;
   JWT_SECRET: string;
   FRONTEND_URL: string;
+  ALLOWED_ORIGINS?: string;
 };
 
 // Extend context to easily attach prisma
@@ -28,8 +29,20 @@ const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // 1. CORS & Setup
 app.use('*', async (c, next) => {
+  const allowedOrigins = c.env.ALLOWED_ORIGINS 
+    ? c.env.ALLOWED_ORIGINS.split(',') 
+    : [c.env.FRONTEND_URL || 'http://localhost:3000'];
+    
   const corsMiddleware = cors({
-    origin: c.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin) => {
+      // If the request origin is in our allowed list, allow it.
+      // If it's undefined (e.g. server-to-server or same-origin without header), 
+      // some browsers/tools might omit it, but usually standard CORS needs a match.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return origin;
+      }
+      return allowedOrigins[0]; // Fallback to primary
+    },
     credentials: true,
   });
   return corsMiddleware(c, next);
