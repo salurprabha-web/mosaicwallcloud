@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-const BACKEND_URL = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+const BACKEND_URL = 'https://mosaic-wall-backend.salurprabha.workers.dev'; // Absolute required for server-side proxy
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ route: string[] }> }) {
   const { route } = await params;

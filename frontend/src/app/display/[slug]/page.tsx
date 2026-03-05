@@ -12,7 +12,7 @@ export default function DisplaySlugPage() {
   const slug = params?.slug as string;
   const [mosaicId, setMosaicId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+  const backend = '';
 
   useEffect(() => {
     if (!slug) return;

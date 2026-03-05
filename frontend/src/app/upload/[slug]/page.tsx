@@ -13,7 +13,7 @@ export default function UploadSlugPage() {
   const [mosaicId, setMosaicId] = useState<string | null>(null);
   const [mosaicName, setMosaicName] = useState('Mosaic Wall');
   const [error, setError] = useState<string | null>(null);
-  const backend = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+  const backend = '';
 
   useEffect(() => {
     if (!slug) return;

@@ -4,11 +4,9 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
-const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
-
 async function getSiteSettings(): Promise<Record<string, string>> {
   try {
-    const res = await fetch(`${backendUrl}/api/site-settings`, { next: { revalidate: 0 } });
+    const res = await fetch(`/api/site-settings`, { next: { revalidate: 0 } });
     if (!res.ok) return {};
     return res.json();
   } catch { return {}; }

@@ -51,10 +51,9 @@ export default function UploadForm({ mosaicId }: { mosaicId?: string } = {}) {
       if (name.trim()) formData.append('name', name.trim());
       if (email.trim()) formData.append('email', email.trim());
       if (mosaicId) formData.append('mosaicId', mosaicId);
-      const backendUrl = 'https://mosaic-wall-backend.salurprabha.workers.dev';
       const token = typeof window !== 'undefined' ? localStorage.getItem('mosaic_token') : null;
       
-      const res = await fetch(`${backendUrl}/api/upload`, {
+      const res = await fetch(`/api/upload`, {
         method: "POST",
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
