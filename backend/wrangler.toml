@@ -7,8 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 
 routes = [
   { pattern = "mosaicwall.in/api/*", zone_name = "mosaicwall.in" },
-  { pattern = "www.mosaicwall.in/api/*", zone_name = "mosaicwall.in" },
-  { pattern = "mosaic-wall-backend.salurprabha.workers.dev/*", zone_name = "" }
+  { pattern = "www.mosaicwall.in/api/*", zone_name = "mosaicwall.in" }
 ]
 
 [vars]
