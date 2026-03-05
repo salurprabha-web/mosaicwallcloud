@@ -140,7 +140,12 @@ export default function Footer({
         </div>
 
         <div className="border-t border-slate-800/40 mt-10 md:mt-14 pt-6 md:pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-slate-600 text-sm text-center md:text-left">© {new Date().getFullYear()} {siteName}. All rights reserved.</p>
+          <p className="text-slate-600 text-sm text-center md:text-left">
+            © {new Date().getFullYear()} {siteName}. All rights reserved. Designed by {' '}
+            <a href="https://www.retreatarcade.in/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+              Retreat Arcade Solutions
+            </a>
+          </p>
           <div className="flex items-center gap-6">
             <p className="text-slate-700 text-xs">Built for unforgettable events</p>
             {waNumber && (
