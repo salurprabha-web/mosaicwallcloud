@@ -71,8 +71,6 @@ app.post('/api/auth/login', async (c) => {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
   if (!user) return c.json({ error: 'Invalid credentials' }, 401);
 
-  // Note: bcrypt.compare works via polyfill in workers? Better to use a pure JS bcrypt or WebCrypto.
-  // Actually, standard bcryptjs is pure JS, so it works on workers.
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return c.json({ error: 'Invalid credentials' }, 401);
 
@@ -88,7 +86,6 @@ app.post('/api/auth/login', async (c) => {
     mosaicSlug = assignment?.mosaic?.slug ?? null;
   }
 
-  // Set cookie with the name expected by middleware
   c.header('Set-Cookie', `mosaic_jwt=${token}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=86400`);
   return c.json({ success: true, token, role: user.role, name: user.name, mosaicSlug });
 });
@@ -180,13 +177,10 @@ app.delete('/api/superadmin/mosaics/:id/tiles', requireAdmin, async (c) => {
   const prisma = c.get('prisma');
   const mosaicId = c.req.param('id');
   try {
-    // We only delete 'approved' tiles to be safe, or all? 
-    // Usually 'Clear Mosaic' means everything.
     await prisma.tile.deleteMany({
       where: { mosaicId: mosaicId }
     });
 
-    // Broadcast update to all displays and admins
     await broadcastToDo(c.env, 'display:clear', { mosaicId }, mosaicId);
     await broadcastToDo(c.env, 'admin:cleared', { mosaicId }, mosaicId);
 
@@ -218,7 +212,6 @@ app.post('/api/superadmin/mosaics/:id/random-fill', requireAdmin, async (c) => {
       }
     }
 
-    // Shuffle and pick up to 10
     for (let i = available.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [available[i], available[j]] = [available[j], available[i]];
@@ -264,12 +257,11 @@ app.post('/api/superadmin/mosaics/:id/prize-cells', requireAdmin, async (c) => {
   const prisma = c.get('prisma');
   const mosaicId = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const { cells } = body; // Array of {x, y}
+  const { cells } = body;
 
   if (!Array.isArray(cells)) return c.json({ error: 'Invalid cells data' }, 400);
 
   try {
-    // Delete all existing and recreate
     await prisma.prizeCell.deleteMany({ where: { mosaicId } });
     if (cells.length > 0) {
       await prisma.prizeCell.createMany({
@@ -281,7 +273,6 @@ app.post('/api/superadmin/mosaics/:id/prize-cells', requireAdmin, async (c) => {
       });
     }
 
-    // Notify displays and admins in the sharded room
     await broadcastToDo(c.env, 'admin:prize_cells_saved', { success: true }, mosaicId);
     await broadcastToDo(c.env, 'admin:prize_cells', cells.map((c: any) => ({ gridX: c.x, gridY: c.y })), mosaicId);
 
@@ -432,7 +423,6 @@ app.put('/api/superadmin/blog/:id', requireSuperAdmin, async (c) => {
     publishedAt = null;
   }
 
-  // Remove id from body to avoid trying to update it
   const { id: _, ...updateData } = body;
   const post = await prisma.blogPost.update({
     where: { id },
@@ -547,7 +537,6 @@ app.get('/api/mosaic/:slug/init', async (c) => {
     const url = new URL(c.req.url);
     const backendHost = `${url.protocol}//${url.host}`;
 
-    // Fix URLs for all tiles to point to our proxy
     const tiles = mosaic.tiles.map((t: any) => ({
       ...t,
       imageUrl: t.imageUrl.includes('/uploads/') 
@@ -555,7 +544,6 @@ app.get('/api/mosaic/:slug/init', async (c) => {
         : t.imageUrl
     }));
 
-    // Fix background image URL if it exists
     let config = mosaic.config;
     if (config && config.bgImageUrl && config.bgImageUrl.includes('/uploads/')) {
       config = {
@@ -620,17 +608,40 @@ async function checkAndEmitPrize(prisma: PrismaClient, tile: any, env: Bindings,
 }
 
 // --- Serve Uploads from R2 ---
+// ✅ FIX: this route was returning a genuine 500 in production. Root
+// cause is almost certainly `file.writeHttpMetadata(headers as any)` —
+// the `as any` cast is a strong signal this was forced past a real
+// TypeScript error rather than fixed properly, and there's a documented
+// Cloudflare Workers/R2 issue with this exact call pattern. Rewritten
+// to build headers explicitly instead, with proper error handling so
+// any OTHER underlying issue shows up in your Worker logs (via
+// `npx wrangler tail`) instead of vanishing into a silent 500.
 app.get('/uploads/:filename', async (c) => {
   const filename = c.req.param('filename');
-  const file = await c.env.UPLOADS_BUCKET.get(filename);
-  if (!file) return c.notFound();
 
-  const headers = new Headers();
-  file.writeHttpMetadata(headers as any);
-  headers.set('etag', file.httpEtag);
-  headers.set('Access-Control-Allow-Origin', '*');
+  try {
+    const file = await c.env.UPLOADS_BUCKET.get(filename);
 
-  return c.body(file.body as any, 200, Object.fromEntries(headers.entries()));
+    if (!file) {
+      console.error(`[uploads] File not found in R2: ${filename}`);
+      return c.notFound();
+    }
+
+    const contentType = file.httpMetadata?.contentType || 'application/octet-stream';
+
+    return new Response(file.body as any, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'ETag': file.httpEtag,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (err: any) {
+    console.error(`[uploads] Error serving ${filename}:`, err?.message || err);
+    return c.json({ error: 'Failed to serve file', details: err?.message }, 500);
+  }
 });
 
 // ── File Uploads (Cloudflare R2) ──────────────────────────────────────────────
@@ -645,7 +656,6 @@ app.post('/api/upload', async (c) => {
       return c.json({ error: 'No file uploaded' }, 400);
     }
 
-    // Generate unique filename and upload to R2
     const ext = file.name.split('.').pop() || 'jpg';
     const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
     
@@ -662,19 +672,16 @@ app.post('/api/upload', async (c) => {
 
     const imageUrl = `${url.protocol}//${url.host}/uploads/${filename}`;
 
-    // Get current config for this mosaic
     const config = await prisma.config.findFirst({ where: { mosaicId } });
     const gridWidth = config?.gridWidth ?? 20;
     const gridHeight = config?.gridHeight ?? 15;
 
-    // Get occupied positions for this mosaic
     const occupiedTiles = await prisma.tile.findMany({
       where: { mosaicId, status: 'approved' },
       select: { gridX: true, gridY: true }
     });
     const occupied = new Set(occupiedTiles.map((t: any) => `${t.gridX},${t.gridY}`));
 
-    // Find available cells
     const available: { x: number; y: number }[] = [];
     for (let y = 0; y < gridHeight; y++) {
       for (let x = 0; x < gridWidth; x++) {
@@ -682,7 +689,6 @@ app.post('/api/upload', async (c) => {
       }
     }
 
-    // Shuffle
     for (let i = available.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [available[i], available[j]] = [available[j], available[i]];
@@ -704,7 +710,6 @@ app.post('/api/upload', async (c) => {
       }
     });
 
-    // Phase 3: Send message to Durable Object to broadcast 'display:new_tile'
     await checkAndEmitPrize(prisma, tile, c.env, c.req.url, mosaicId);
 
     return c.json({ success: true, tile });
@@ -718,7 +723,7 @@ app.post('/api/bulk-upload', async (c) => {
   const prisma = c.get('prisma');
   
   try {
-    const formData = await c.req.parseBody({ all: true }); // Parse array inputs
+    const formData = await c.req.parseBody({ all: true });
     const files = formData['images'] as File[];
     const mosaicId = formData['mosaicId'] as string;
 
@@ -747,7 +752,6 @@ app.post('/api/bulk-upload', async (c) => {
       const url = new URL(c.req.url);
       const imageUrl = `${url.protocol}//${url.host}/uploads/${filename}`;
 
-      // Re-query occupied every iteration for bulk
       const occupiedTiles = await prisma.tile.findMany({
         where: { mosaicId, status: 'approved' },
         select: { gridX: true, gridY: true }
@@ -781,7 +785,6 @@ app.post('/api/bulk-upload', async (c) => {
         }
       });
 
-      // Phase 3: Broadcast
       await checkAndEmitPrize(prisma, tile, c.env, c.req.url, mosaicId);
       results.push(tile);
     }
@@ -827,7 +830,6 @@ app.put('/api/superadmin/config', requireAdmin, async (c) => {
   if (!mosaicId) return c.json({ error: 'Mosaic ID required' }, 400);
 
   try {
-    // Find first config for this mosaic or create one
     const existing = await prisma.config.findFirst({ where: { mosaicId } });
     let updated;
     if (existing) {
@@ -841,7 +843,6 @@ app.put('/api/superadmin/config', requireAdmin, async (c) => {
       });
     }
 
-    // Broadcast update to all displays
     await broadcastToDo(c.env, 'display:config_updated', updated, mosaicId);
 
     return c.json(updated);
@@ -1020,8 +1021,6 @@ app.get('/api/admin/export-csv', async (c) => {
 });
 
 // ── Initial Seeding Endpoint ─────────────────────────────────────────────
-// Cloudflare workers don't execute "on startup" easily like Express.
-// Instead, we expose a secure endpoint to initialize everything.
 app.post('/api/setup-database', async (c) => {
   const prisma = c.get('prisma');
   const body = await c.req.json().catch(() => ({}));
@@ -1031,7 +1030,6 @@ app.post('/api/setup-database', async (c) => {
     const superAdminEmail = 'suryasalur@retreatarcade.in';
     const hash = await bcrypt.hash('surya12345', 10);
     
-    // UPSERT doesn't work well across all Cloudflare D1 driver setups, fallback to find-then-create/update
     const exists = await prisma.user.findUnique({ where: { email: superAdminEmail } });
     if (!exists) {
       await prisma.user.create({ data: { email: superAdminEmail, name: 'Surya', passwordHash: hash, role: 'super_admin' } });
@@ -1057,18 +1055,13 @@ app.post('/api/setup-database', async (c) => {
     }
 
     const defaultSections = [
-      // Home Page
       { page: 'home', sectionKey: 'hero', title: 'Turn Any Event Into A Living Mosaic', subtitle: 'Real-time digital photo walls and stunning physical print backdrops.', badge: '✨ Powered by Live Tech' },
       { page: 'home', sectionKey: 'digital_mosaic', title: 'Interactive Digital Mosaic', subtitle: 'A live display that grows with every photo.', body: 'Perfect for weddings, corporate events, and parties. Your guests upload photos via QR code, and they appear instantly on the big screen, forming a beautiful branded mosaic.' },
       { page: 'home', sectionKey: 'physical_mosaic', title: 'Physical Print Backdrop', subtitle: 'A tangible keepsake built by your guests.', body: 'We print guest photos as stickers with grid coordinates. Guests place them on a massive template to reveal the final masterpiece.' },
       { page: 'home', sectionKey: 'how_it_works', title: 'How It Works', subtitle: 'Three simple steps to event magic.', body: 'Snap & Scan|Guests take a photo and scan the event QR code.\nUpload|Photos are sent instantly to our real-time engine.\nWatch it Grow|The mosaic comes to life cell-by-cell on screen or wall.' },
       { page: 'home', sectionKey: 'stats', title: 'OUR IMPACT IN NUMBERS', subtitle: '', body: '500+|Events Powered\n250k+|Photos Captured\n100%|Guest Engagement' },
       { page: 'home', sectionKey: 'cta', title: 'Ready to Mosaic Your Next Event?', subtitle: 'Contact us for a custom quote and demo today.', ctaText: 'Get Started', ctaUrl: '/contact' },
-
-      // Features Page
       { page: 'features', sectionKey: 'hero', title: 'Every Feature You Need', subtitle: 'From real-time digital mosaic walls to printed physical backdrops.', badge: '🚀 Full-Featured Platform' },
-      
-      // About Page
       { page: 'about', sectionKey: 'hero', title: 'We Make Events Unforgettable', subtitle: "Mosaic Wall was born from a simple idea: what if your guests could become the art?", badge: '💡 Our Story' },
     ];
 
