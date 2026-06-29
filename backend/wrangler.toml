@@ -1,19 +1,8 @@
 name = "mosaic-wall-backend"
 main = "src/index.ts"
 compatibility_date = "2024-03-04"
-
-# Node.js compatibility is required for Prisma adapter
 compatibility_flags = ["nodejs_compat"]
 
-# ✅ FIX: uploaded images were returning broken/black tiles on both the
-# upload confirmation screen and the live display wall. Root cause: the
-# backend code saves image URLs as https://mosaicwall.in/uploads/<filename>
-# (see app.get('/uploads/:filename', ...) in src/index.ts), but this
-# Worker was only bound to handle /api/* — meaning every request to
-# /uploads/* never reached this Worker at all and the image 404'd
-# silently, even though the file is very likely sitting correctly in
-# the R2 bucket the whole time. Adding /uploads/* as a second bound
-# route pattern fixes this without touching any application code.
 routes = [
   { pattern = "mosaicwall.in/api/*", zone_name = "mosaicwall.in" },
   { pattern = "www.mosaicwall.in/api/*", zone_name = "mosaicwall.in" },
@@ -24,28 +13,33 @@ routes = [
 [vars]
 FRONTEND_URL = "https://mosaicwall.in"
 ALLOWED_ORIGINS = "https://mosaicwall.in,https://www.mosaicwall.in,https://mosaicwallcloud1.salurprabha.workers.dev"
-# ⚠️ JWT_SECRET intentionally removed from this file — see the separate
-# security fix from earlier. Set it via:
-#   npx wrangler secret put JWT_SECRET
-# instead of storing it here in plain text.
 
-# Bind a D1 database
+# ✅ NEW — fixes the "display defaults until I push" bug. The
+# MosaicRoom Durable Object needs to call this Worker's own
+# /api/mosaic/:slug/init route to fetch saved config when a display
+# screen connects. It previously guessed this URL at runtime via
+# `currentHost`, which could be unset on certain DO instances and
+# silently fell back to a non-existent localhost address. This makes
+# it an explicit, always-correct binding instead.
+SELF_URL = "https://mosaic-wall-backend.salurprabha.workers.dev"
+
+# JWT_SECRET is set via: npx wrangler secret put JWT_SECRET
+# (NOT stored here in plain text — see earlier security fix)
+
 [[d1_databases]]
 binding = "DB"
 database_name = "mosaic-db"
 database_id = "d12cb5b7-58c8-4161-b2c9-68d97d64b0b3"
 migrations_dir = "prisma/migrations"
 
-# Bind an R2 bucket
 [[r2_buckets]]
 binding = "UPLOADS_BUCKET"
 bucket_name = "uploads-bucket"
 
-# Bind Durable Objects for WebSockets
 [[durable_objects.bindings]]
 name = "MOSAIC_ROOM"
 class_name = "MosaicRoom"
 
 [[migrations]]
-tag = "v1" # Needs to match the migration tag
+tag = "v1"
 new_sqlite_classes = ["MosaicRoom"]
