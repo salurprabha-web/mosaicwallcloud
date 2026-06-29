@@ -17,11 +17,12 @@ export type Bindings = {
   JWT_SECRET: string;
   FRONTEND_URL: string;
   ALLOWED_ORIGINS?: string;
+  SELF_URL?: string;
 };
 
 // Extend context to easily attach prisma
 type Variables = {
-  prisma: any; // Type as 'any' to bypass PrismaClient / adapter strict version conflicts in cloudflare types
+  prisma: any;
   user?: { userId: string; role: string; email: string; name: string };
 };
 
@@ -35,13 +36,10 @@ app.use('*', async (c, next) => {
     
   const corsMiddleware = cors({
     origin: (origin) => {
-      // If the request origin is in our allowed list, allow it.
-      // If it's undefined (e.g. server-to-server or same-origin without header), 
-      // some browsers/tools might omit it, but usually standard CORS needs a match.
       if (!origin || allowedOrigins.includes(origin)) {
         return origin;
       }
-      return allowedOrigins[0]; // Fallback to primary
+      return allowedOrigins[0];
     },
     credentials: true,
   });
@@ -51,7 +49,6 @@ app.use('*', async (c, next) => {
 // 2. Prisma D1 Instantiation Middleware per-request
 app.use('*', async (c, next) => {
   const adapter = new PrismaD1(c.env.DB);
-  // Using pure PrismaClient with adapter bypassing strict type checks
   const prisma = new PrismaClient({ adapter } as any);
   c.set('prisma', prisma);
   await next();
@@ -520,6 +517,7 @@ app.get('/api/page-sections/:page', async (c) => {
   }
 });
 
+// ✅ FIXED ROUTE — see full explanation below the route
 app.get('/api/mosaic/:slug/init', async (c) => {
   const prisma = c.get('prisma');
   const slug = c.req.param('slug');
@@ -527,7 +525,20 @@ app.get('/api/mosaic/:slug/init', async (c) => {
     const mosaic = await prisma.mosaic.findUnique({
       where: { slug },
       include: { 
-        config: true, 
+        configs: true,   // ✅ FIXED — schema.prisma defines this relation
+                          // as "configs" (plural, Config[]) on the Mosaic
+                          // model, because Config.mosaicId has no @unique
+                          // constraint. The original code used "config"
+                          // (singular), which doesn't match any real
+                          // relation field name, so mosaic.config below
+                          // was never reliably populated — this is why
+                          // the display screen kept losing its saved
+                          // grid size/settings on load while every OTHER
+                          // route (uploads, stats, Push to Display itself)
+                          // worked fine, since those all query the Config
+                          // model directly via prisma.config.findFirst(),
+                          // a completely different and correct pattern
+                          // unaffected by this relation-naming issue.
         tiles: { where: { status: 'approved' } },
         prizeCells: true
       }
@@ -544,7 +555,16 @@ app.get('/api/mosaic/:slug/init', async (c) => {
         : t.imageUrl
     }));
 
-    let config = mosaic.config;
+    // ✅ FIXED — configs is an array (per the real schema relation).
+    // In practice you only ever maintain one Config row per mosaic
+    // (the find-or-create logic in PUT /api/superadmin/config
+    // guarantees this), so we take the most recently updated entry.
+    let config: any = mosaic.configs && mosaic.configs.length > 0
+      ? mosaic.configs.reduce((latest: any, cfg: any) =>
+          (!latest || new Date(cfg.updatedAt) > new Date(latest.updatedAt)) ? cfg : latest
+        )
+      : null;
+
     if (config && config.bgImageUrl && config.bgImageUrl.includes('/uploads/')) {
       config = {
         ...config,
@@ -554,6 +574,7 @@ app.get('/api/mosaic/:slug/init', async (c) => {
 
     return c.json({ config: config || null, tiles });
   } catch (err) {
+    console.error('[init route] Failed to fetch initial state:', err);
     return c.json({ error: 'Failed to fetch initial state' }, 500);
   }
 });
@@ -608,14 +629,6 @@ async function checkAndEmitPrize(prisma: PrismaClient, tile: any, env: Bindings,
 }
 
 // --- Serve Uploads from R2 ---
-// ✅ FIX: this route was returning a genuine 500 in production. Root
-// cause is almost certainly `file.writeHttpMetadata(headers as any)` —
-// the `as any` cast is a strong signal this was forced past a real
-// TypeScript error rather than fixed properly, and there's a documented
-// Cloudflare Workers/R2 issue with this exact call pattern. Rewritten
-// to build headers explicitly instead, with proper error handling so
-// any OTHER underlying issue shows up in your Worker logs (via
-// `npx wrangler tail`) instead of vanishing into a silent 500.
 app.get('/uploads/:filename', async (c) => {
   const filename = c.req.param('filename');
 
