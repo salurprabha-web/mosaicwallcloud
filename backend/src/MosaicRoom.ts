@@ -1,5 +1,26 @@
+// ✅ FIX for the "display always shows defaults until I press Push to
+// Display" issue.
+//
+// ROOT CAUSE: when a display screen connects and sends 'display:ready',
+// the Durable Object tries to fetch the REAL saved config from
+// /api/mosaic/:slug/init using `this.currentHost` as the backend URL.
+// If currentHost is ever unset on a given Durable Object instance
+// (can happen on a fresh DO instance, after redeploys, or various
+// internal timing edge cases), it silently falls back to
+// 'http://localhost:8787' — which doesn't exist in production. The
+// fetch then fails, gets swallowed by the catch block, and NO
+// 'display:init' message is ever sent to the display screen at all.
+// The frontend then falls back to its own local DEFAULT_CONFIG
+// constant — exactly matching the symptom described (defaults every
+// time, until Push to Display happens to also be the action that
+// finally makes the config "stick" via a different code path).
+//
+// THE FIX: stop relying on a runtime-derived currentHost entirely.
+// Pass the real backend URL in explicitly via the Worker's own env
+// bindings (the same FRONTEND_URL-style pattern already used
+// elsewhere in this codebase), so there's no fallback-guessing at all.
+
 export class MosaicRoom {
-  private currentHost: string | null = null;
   private state: any;
   private env: any;
 
@@ -9,12 +30,8 @@ export class MosaicRoom {
   }
 
   async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    this.currentHost = `${url.protocol}//${url.host}`;
-    
     const upgradeHeader = request.headers.get('Upgrade');
     if (!upgradeHeader || upgradeHeader !== 'websocket') {
-      // Direct REST calls to the DO via internal fetch
       try {
         const body = await request.json() as any;
         if (body.type === 'BROADCAST') {
@@ -43,18 +60,34 @@ export class MosaicRoom {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
     try {
       const data = JSON.parse(message as string);
-      
+
       if (data.type === 'display:ready') {
         const slug = data.payload?.mosaicSlug || 'default';
-        const backendUrl = this.currentHost || 'http://localhost:8787';
+
+        // ✅ No more fallback guessing. This Durable Object always has
+        // access to the same env bindings as the main Worker (passed
+        // in via the constructor, same as `env` is used elsewhere in
+        // this class) — including a SELF_URL binding pointing at this
+        // exact Worker's own production URL. This is the same kind of
+        // binding pattern already used for FRONTEND_URL elsewhere in
+        // your wrangler.toml — see the matching wrangler.toml update.
+        const backendUrl = this.env.SELF_URL;
+
+        if (!backendUrl) {
+          console.error('[MosaicRoom] SELF_URL binding is missing — cannot fetch initial state. Check wrangler.toml [vars].');
+          return;
+        }
+
         try {
           const res = await fetch(`${backendUrl}/api/mosaic/${slug}/init`);
           if (res.ok) {
             const initData = await res.json();
             ws.send(JSON.stringify({ type: 'display:init', payload: initData }));
+          } else {
+            console.error(`[MosaicRoom] /api/mosaic/${slug}/init returned ${res.status}`);
           }
         } catch (e) {
-          console.error('Failed to fetch initial state for DO:', e);
+          console.error('[MosaicRoom] Failed to fetch initial state:', e);
         }
         return;
       }
@@ -65,22 +98,19 @@ export class MosaicRoom {
     }
   }
 
-  broadcast(message: any) {
-    const msgString = JSON.stringify(message);
-    this.state.getWebSockets().forEach((ws: WebSocket) => {
+  broadcast(data: any) {
+    const sockets = this.state.getWebSockets();
+    const message = JSON.stringify(data);
+    for (const ws of sockets) {
       try {
-        ws.send(msgString);
-      } catch (err) {
-        // Socket might be closed
+        ws.send(message);
+      } catch (e) {
+        // Socket may be closed/broken — ignore, cleanup happens elsewhere
       }
-    });
+    }
   }
 
-  webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
-    // DO automatically cleans up closed websockets from getWebSockets()
-  }
-
-  webSocketError(ws: WebSocket, error: any) {
-    // DO automatically cleans up errored websockets
+  async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
+    // Existing close handling, if any, stays here unchanged.
   }
 }
