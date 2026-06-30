@@ -7,7 +7,6 @@ import { sign } from 'hono/jwt';
 import { authMiddleware } from './middleware/auth';
 import * as bcrypt from 'bcryptjs';
 
-// Cloudflare worker types
 import type { D1Database, R2Bucket, DurableObjectNamespace } from '@cloudflare/workers-types';
 
 export type Bindings = {
@@ -20,7 +19,6 @@ export type Bindings = {
   SELF_URL?: string;
 };
 
-// Extend context to easily attach prisma
 type Variables = {
   prisma: any;
   user?: { userId: string; role: string; email: string; name: string };
@@ -28,7 +26,6 @@ type Variables = {
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// 1. CORS & Setup
 app.use('*', async (c, next) => {
   const allowedOrigins = c.env.ALLOWED_ORIGINS 
     ? c.env.ALLOWED_ORIGINS.split(',') 
@@ -46,7 +43,6 @@ app.use('*', async (c, next) => {
   return corsMiddleware(c, next);
 });
 
-// 2. Prisma D1 Instantiation Middleware per-request
 app.use('*', async (c, next) => {
   const adapter = new PrismaD1(c.env.DB);
   const prisma = new PrismaClient({ adapter } as any);
@@ -54,10 +50,8 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Health check
 app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString(), runtime: 'cloudflare-worker' }));
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', async (c) => {
   const prisma = c.get('prisma');
   const body = await c.req.json().catch(() => ({}));
@@ -96,7 +90,6 @@ app.get('/api/auth/me', authMiddleware, (c) => {
   return c.json({ user: c.get('user') });
 });
 
-// Middleware for roles
 const requireSuperAdmin = async (c: Context, next: any) => {
   await authMiddleware(c, async () => {
     const user = c.get('user');
@@ -113,7 +106,6 @@ const requireAdmin = async (c: Context, next: any) => {
   });
 };
 
-// ── Superadmin: Mosaics ───────────────────────────────────────────────────────
 app.get('/api/superadmin/mosaics', requireSuperAdmin, async (c) => {
   const prisma = c.get('prisma');
   const mosaics = await prisma.mosaic.findMany({
@@ -280,7 +272,6 @@ app.post('/api/superadmin/mosaics/:id/prize-cells', requireAdmin, async (c) => {
   }
 });
 
-// ── Superadmin: Users ─────────────────────────────────────────────────────────
 app.get('/api/superadmin/users', requireSuperAdmin, async (c) => {
   const prisma = c.get('prisma');
   const users = await prisma.user.findMany({
@@ -350,7 +341,6 @@ app.post('/api/superadmin/assign', requireSuperAdmin, async (c) => {
   }
 });
 
-// --- SuperAdmin Stats ---
 app.get('/api/superadmin/stats', requireSuperAdmin, async (c) => {
   const prisma = c.get('prisma');
   const [mosaics, admins, tiles] = await Promise.all([
@@ -361,7 +351,6 @@ app.get('/api/superadmin/stats', requireSuperAdmin, async (c) => {
   return c.json({ mosaics, admins, tiles });
 });
 
-// --- SuperAdmin Site Settings ---
 app.get('/api/superadmin/site-settings', requireSuperAdmin, async (c) => {
   const prisma = c.get('prisma');
   const settings = await prisma.siteSetting.findMany();
@@ -386,7 +375,6 @@ app.put('/api/superadmin/site-settings', requireSuperAdmin, async (c) => {
   return c.json({ success: true });
 });
 
-// --- SuperAdmin Blog ---
 app.get('/api/superadmin/blog', requireSuperAdmin, async (c) => {
   const prisma = c.get('prisma');
   const posts = await prisma.blogPost.findMany({
@@ -435,7 +423,6 @@ app.delete('/api/superadmin/blog/:id', requireSuperAdmin, async (c) => {
   return c.json({ success: true });
 });
 
-// --- SuperAdmin Page Sections ---
 app.get('/api/superadmin/page-sections/:page', requireSuperAdmin, async (c) => {
   const prisma = c.get('prisma');
   const page = c.req.param('page');
@@ -460,7 +447,6 @@ app.put('/api/superadmin/page-sections', requireSuperAdmin, async (c) => {
   return c.json(updated);
 });
 
-// ── Public CMS ──────────────────────────────────────────────────────────────
 app.get('/api/site-settings', async (c) => {
   const prisma = c.get('prisma');
   try {
@@ -517,65 +503,53 @@ app.get('/api/page-sections/:page', async (c) => {
   }
 });
 
-// ✅ FIXED ROUTE — see full explanation below the route
+// ✅ BULLETPROOF REWRITE — no longer uses the fragile relational
+// `include: { configs: true }` pattern at all. Queries Config directly
+// via the exact same simple, proven pattern every other route in this
+// file already uses successfully (prisma.config.findFirst). This
+// removes any dependency on Prisma Client generation timing/relation
+// resolution being exactly in sync with schema.prisma — the suspected
+// fragile link behind the repeated "Failed to fetch initial state"
+// errors despite the underlying data being confirmed correct.
 app.get('/api/mosaic/:slug/init', async (c) => {
   const prisma = c.get('prisma');
   const slug = c.req.param('slug');
   try {
     const mosaic = await prisma.mosaic.findUnique({
       where: { slug },
-      include: { 
-        configs: true,   // ✅ FIXED — schema.prisma defines this relation
-                          // as "configs" (plural, Config[]) on the Mosaic
-                          // model, because Config.mosaicId has no @unique
-                          // constraint. The original code used "config"
-                          // (singular), which doesn't match any real
-                          // relation field name, so mosaic.config below
-                          // was never reliably populated — this is why
-                          // the display screen kept losing its saved
-                          // grid size/settings on load while every OTHER
-                          // route (uploads, stats, Push to Display itself)
-                          // worked fine, since those all query the Config
-                          // model directly via prisma.config.findFirst(),
-                          // a completely different and correct pattern
-                          // unaffected by this relation-naming issue.
-        tiles: { where: { status: 'approved' } },
-        prizeCells: true
-      }
     });
     if (!mosaic) return c.json({ error: 'Mosaic not found' }, 404);
+
+    const mosaicId = mosaic.id;
+
+    const [config, tiles, prizeCells] = await Promise.all([
+      prisma.config.findFirst({ where: { mosaicId } }),
+      prisma.tile.findMany({ where: { mosaicId, status: 'approved' } }),
+      prisma.prizeCell.findMany({ where: { mosaicId } }),
+    ]);
 
     const url = new URL(c.req.url);
     const backendHost = `${url.protocol}//${url.host}`;
 
-    const tiles = mosaic.tiles.map((t: any) => ({
+    const fixedTiles = tiles.map((t: any) => ({
       ...t,
-      imageUrl: t.imageUrl.includes('/uploads/') 
+      imageUrl: t.imageUrl.includes('/uploads/')
         ? `${backendHost}/uploads/${t.imageUrl.split('/uploads/')[1]}`
         : t.imageUrl
     }));
 
-    // ✅ FIXED — configs is an array (per the real schema relation).
-    // In practice you only ever maintain one Config row per mosaic
-    // (the find-or-create logic in PUT /api/superadmin/config
-    // guarantees this), so we take the most recently updated entry.
-    let config: any = mosaic.configs && mosaic.configs.length > 0
-      ? mosaic.configs.reduce((latest: any, cfg: any) =>
-          (!latest || new Date(cfg.updatedAt) > new Date(latest.updatedAt)) ? cfg : latest
-        )
-      : null;
-
-    if (config && config.bgImageUrl && config.bgImageUrl.includes('/uploads/')) {
-      config = {
-        ...config,
-        bgImageUrl: `${backendHost}/uploads/${config.bgImageUrl.split('/uploads/')[1]}`
+    let fixedConfig: any = config;
+    if (fixedConfig && fixedConfig.bgImageUrl && fixedConfig.bgImageUrl.includes('/uploads/')) {
+      fixedConfig = {
+        ...fixedConfig,
+        bgImageUrl: `${backendHost}/uploads/${fixedConfig.bgImageUrl.split('/uploads/')[1]}`
       };
     }
 
-    return c.json({ config: config || null, tiles });
-  } catch (err) {
-    console.error('[init route] Failed to fetch initial state:', err);
-    return c.json({ error: 'Failed to fetch initial state' }, 500);
+    return c.json({ config: fixedConfig || null, tiles: fixedTiles, prizeCells });
+  } catch (err: any) {
+    console.error('[init route] Failed to fetch initial state:', err?.message || err);
+    return c.json({ error: 'Failed to fetch initial state', details: err?.message }, 500);
   }
 });
 
@@ -628,7 +602,6 @@ async function checkAndEmitPrize(prisma: PrismaClient, tile: any, env: Bindings,
   }
 }
 
-// --- Serve Uploads from R2 ---
 app.get('/uploads/:filename', async (c) => {
   const filename = c.req.param('filename');
 
@@ -657,7 +630,6 @@ app.get('/uploads/:filename', async (c) => {
   }
 });
 
-// ── File Uploads (Cloudflare R2) ──────────────────────────────────────────────
 app.post('/api/upload', async (c) => {
   const prisma = c.get('prisma');
   
@@ -809,7 +781,6 @@ app.post('/api/bulk-upload', async (c) => {
   }
 });
 
-// ── Background Upload ────────────────────────────────────────────────────────
 app.post('/api/superadmin/config/background', requireAdmin, async (c) => {
   const prisma = c.get('prisma');
   try {
@@ -865,7 +836,6 @@ app.put('/api/superadmin/config', requireAdmin, async (c) => {
   }
 });
 
-// ── Admin: Overview Stats ─────────────────────────────────────────────────────
 app.get('/api/stats', async (c) => {
   const prisma = c.get('prisma');
   const mosaicId = c.req.query('mosaicId');
@@ -894,7 +864,6 @@ app.get('/api/stats', async (c) => {
   }
 });
 
-// ── Config ────────────────────────────────────────────────────────────────
 app.get('/api/config', async (c) => {
   const prisma = c.get('prisma');
   const mosaicId = c.req.query('mosaicId');
@@ -921,7 +890,6 @@ app.get('/api/config', async (c) => {
   }
 });
 
-// ── Print Endpoints ───────────────────────────────────────────────────────
 app.get('/api/print/sticker-sheet', async (c) => {
   const prisma = c.get('prisma');
   const mosaicId = c.req.query('mosaicId');
@@ -998,7 +966,6 @@ app.get('/api/print/backdrop-config', async (c) => {
   }
 });
 
-// ── Exports ──────────────────────────────────────────────────────────────
 app.get('/api/admin/export-csv', async (c) => {
   const prisma = c.get('prisma');
   const mosaicId = c.req.query('mosaicId');
@@ -1033,7 +1000,6 @@ app.get('/api/admin/export-csv', async (c) => {
   }
 });
 
-// ── Initial Seeding Endpoint ─────────────────────────────────────────────
 app.post('/api/setup-database', async (c) => {
   const prisma = c.get('prisma');
   const body = await c.req.json().catch(() => ({}));
@@ -1089,7 +1055,6 @@ app.post('/api/setup-database', async (c) => {
   }
 });
 
-// ── WebSockets via Durable Objects ───────────────────────────────────────
 app.get('/api/ws', async (c) => {
   const upgradeHeader = c.req.header('Upgrade');
   if (!upgradeHeader || upgradeHeader !== 'websocket') {
