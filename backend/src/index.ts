@@ -26,22 +26,28 @@ type Variables = {
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-app.use('*', async (c, next) => {
-  const allowedOrigins = c.env.ALLOWED_ORIGINS 
-    ? c.env.ALLOWED_ORIGINS.split(',') 
-    : [c.env.FRONTEND_URL || 'http://localhost:3000'];
-    
-  const corsMiddleware = cors({
-    origin: (origin) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return origin;
-      }
-      return allowedOrigins[0];
-    },
-    credentials: true,
-  });
-  return corsMiddleware(c, next);
-});
+// ✅ FIX: previously wrapped cors() inside a custom async middleware
+// function, manually calling corsMiddleware(c, next) — a non-standard
+// pattern that's a documented source of broken CORS preflight (OPTIONS)
+// responses in Hono + Cloudflare Workers, even when origin-matching
+// logic is otherwise correct. Now uses cors() directly AS the
+// middleware, per Hono's own documented pattern, with origin handled
+// via the supported (origin, c) callback signature.
+app.use('*', cors({
+  origin: (origin, c) => {
+    const allowedOrigins = c.env.ALLOWED_ORIGINS
+      ? c.env.ALLOWED_ORIGINS.split(',')
+      : [c.env.FRONTEND_URL || 'http://localhost:3000'];
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      return origin;
+    }
+    return allowedOrigins[0];
+  },
+  credentials: true,
+  allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+}));
 
 app.use('*', async (c, next) => {
   const adapter = new PrismaD1(c.env.DB);
