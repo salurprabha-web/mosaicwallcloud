@@ -20,6 +20,15 @@ interface UploadedTile {
   gridWidth?: number;
 }
 
+// ✅ FOUND while tracing the "photos lost" issue directly — this file
+// used a bare relative path '/api/upload' with no backend URL at all,
+// and no Next.js rewrite/proxy exists to resolve it correctly. Photo
+// uploads from guests may have been failing or behaving inconsistently
+// depending on hosting/routing conditions. Pointing this at the real
+// custom domain backend explicitly, matching the fix already applied
+// to the display and upload SLUG pages.
+const BACKEND_URL = 'https://mosaicwall.in';
+
 export default function UploadForm({ mosaicId }: { mosaicId?: string } = {}) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -53,7 +62,7 @@ export default function UploadForm({ mosaicId }: { mosaicId?: string } = {}) {
       if (mosaicId) formData.append('mosaicId', mosaicId);
       const token = typeof window !== 'undefined' ? localStorage.getItem('mosaic_token') : null;
       
-      const res = await fetch(`/api/upload`, {
+      const res = await fetch(`${BACKEND_URL}/api/upload`, {
         method: "POST",
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
