@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-// Removed socket.io-client for raw WebSockets compatible with Cloudflare Durable Objects
 import {
   Settings, Play, Pause, Zap, Shield, LayoutGrid,
   Image as ImageIcon, Upload, ChevronRight, Activity,
-  X, Check, Sliders, MonitorPlay, Home, Loader2, Gift, Star, Printer, LogOut, Link2, Copy, ExternalLink, DownloadCloud
+  X, Check, Sliders, MonitorPlay, Home, Loader2, Gift, Star, Printer, LogOut, Link2, Copy, ExternalLink, DownloadCloud, Save
 } from 'lucide-react';
+
+// ✅ Single source of truth for the backend URL — fixes the repeated
+// `const backendUrl = '';` bug found in MANY functions throughout this
+// file. An empty string meant every fetch() call below was attempting
+// a bare relative path instead of reaching the real backend — this is
+// the root cause of Push to Display (and likely other actions) silently
+// failing to persist anything.
+const BACKEND_URL = 'https://mosaic-wall-backend.salurprabha.workers.dev';
 
 type PushStatus = 'idle' | 'pushing' | 'success' | 'error';
 type ClearStatus = 'idle' | 'clearing' | 'success' | 'error';
@@ -32,7 +39,6 @@ interface Tile {
   createdAt?: string;
 }
 
-// ── ShareLinkRow subcomponent ─────────────────────────────────────────────────
 function ShareLinkRow({ label, url, desc }: { label: string; url: string; desc: string }) {
   const [copied, setCopied] = useState(false);
   const doCopy = () => {
@@ -92,7 +98,7 @@ export default function AdminDashboard({
   const [bulkFiles, setBulkFiles] = useState<File[]>([]);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
-  const [prizeCells, setPrizeCells] = useState<Set<string>>(new Set()); // 'x,y' strings
+  const [prizeCells, setPrizeCells] = useState<Set<string>>(new Set());
   const [prizeStatus, setPrizeStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const bulkInputRef = useRef<HTMLInputElement>(null);
   const bgFileRef = useRef<HTMLInputElement>(null);
@@ -115,8 +121,6 @@ export default function AdminDashboard({
     const wsUrl = `${protocol}//${window.location.host}/api/ws?mosaicId=${mosaicId}`;
     const sock = new WebSocket(wsUrl);
     setSocket(sock);
-    
-    const backendUrl = '';
 
     const on = (type: string, handler: (data: any) => void) => {
       sock.addEventListener('message', (event) => {
@@ -129,9 +133,8 @@ export default function AdminDashboard({
 
     sock.onopen = () => {
       setConnected(true);
-      // Fetch initial tile stats from backend
       let token = localStorage.getItem('mosaic_token');
-      fetch(`${backendUrl}/api/stats?mosaicId=${mosaicId}`, {
+      fetch(`${BACKEND_URL}/api/stats?mosaicId=${mosaicId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
         .then((r) => r.json())
@@ -150,12 +153,11 @@ export default function AdminDashboard({
           }
         })
         .catch(() => {});
-      
-      // Fetch Prize Cells via REST
+
       token = localStorage.getItem('mosaic_token');
-      fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/prize-cells`, { 
+      fetch(`${BACKEND_URL}/api/superadmin/mosaics/${mosaicId}/prize-cells`, {
         headers: { 'Authorization': `Bearer ${token}` },
-        credentials: 'include' 
+        credentials: 'include'
       })
         .then(r => r.json())
         .then(cells => {
@@ -167,7 +169,7 @@ export default function AdminDashboard({
     };
 
     sock.onclose = () => setConnected(false);
-    
+
     on('admin:config_saved', (result: { success: boolean }) => {
       setPushStatus(result.success ? 'success' : 'error');
       if (pushToastTimer.current) clearTimeout(pushToastTimer.current);
@@ -209,14 +211,13 @@ export default function AdminDashboard({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const backendUrl = '';
     const token = localStorage.getItem('mosaic_token');
     const formData = new FormData();
     formData.append('file', file);
     if (mosaicId) formData.append('mosaicId', mosaicId);
 
     try {
-      const res = await fetch(`${backendUrl}/api/superadmin/config/background`, {
+      const res = await fetch(`${BACKEND_URL}/api/superadmin/config/background`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData,
@@ -227,7 +228,6 @@ export default function AdminDashboard({
       setBgPreview(data.imageUrl);
     } catch (err) {
       console.error('BG Upload error:', err);
-      // Fallback to local preview for immediate visual feedback if upload fails (though it won't persist)
       const reader = new FileReader();
       reader.onloadend = () => setBgPreview(reader.result as string);
       reader.readAsDataURL(file);
@@ -241,18 +241,17 @@ export default function AdminDashboard({
     if (fillStatus === 'filling') return;
     setFillStatus('filling');
     setFillMessage('');
-    
-    const backendUrl = '';
+
     const token = localStorage.getItem('mosaic_token');
     try {
-      const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/random-fill`, {
+      const res = await fetch(`${BACKEND_URL}/api/superadmin/mosaics/${mosaicId}/random-fill`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Random fill failed');
-      
+
       setFillStatus('done');
       setFillMessage(`Filled ${data.count ?? 0} cells!`);
       if (fillTimer.current) clearTimeout(fillTimer.current);
@@ -270,16 +269,15 @@ export default function AdminDashboard({
     if (bulkFiles.length === 0) return;
     setBulkProgress({ done: 0, total: bulkFiles.length });
     setBulkError(null);
-    const backendUrl = '';
     const token = localStorage.getItem('mosaic_token');
     const formData = new FormData();
     if (mosaicId) formData.append('mosaicId', mosaicId);
     bulkFiles.forEach((f) => formData.append('images', f));
     try {
-      const res = await fetch(`${backendUrl}/api/bulk-upload`, { 
-        method: 'POST', 
+      const res = await fetch(`${BACKEND_URL}/api/bulk-upload`, {
+        method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
-        body: formData 
+        body: formData
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Upload failed');
@@ -298,13 +296,12 @@ export default function AdminDashboard({
       const [x, y] = k.split(',').map(Number);
       return { x, y };
     });
-    
-    const backendUrl = '';
+
     const token = localStorage.getItem('mosaic_token');
     try {
-      const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/prize-cells`, {
+      const res = await fetch(`${BACKEND_URL}/api/superadmin/mosaics/${mosaicId}/prize-cells`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -332,24 +329,21 @@ export default function AdminDashboard({
 
   const handleClearMosaic = async () => {
     if (!window.confirm('Are you sure you want to clear the entire mosaic? This will delete all guest photos permanently.')) return;
-    
+
     setClearStatus('clearing');
-    const backendUrl = '';
     const token = localStorage.getItem('mosaic_token');
-    
+
     try {
-      const res = await fetch(`${backendUrl}/api/superadmin/mosaics/${mosaicId}/tiles`, {
+      const res = await fetch(`${BACKEND_URL}/api/superadmin/mosaics/${mosaicId}/tiles`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
         credentials: 'include'
       });
-      
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Failed to clear mosaic');
       }
-      
-      // Success is handled via WebSocket 'admin:cleared' broadcast
     } catch (err) {
       console.error('Clear error:', err);
       setClearStatus('error');
@@ -358,11 +352,15 @@ export default function AdminDashboard({
     }
   };
 
-  const pushConfig = async () => {
+  // ✅ RENAMED from pushConfig — same function, but now genuinely
+  // reflects what it does: permanently saves settings to the database.
+  // No longer depends on `connected` (WebSocket status) to be allowed
+  // to run — saving data should never be gated by a real-time broadcast
+  // connection being currently open, those are unrelated concerns.
+  const saveSettings = async () => {
     if (pushStatus === 'pushing') return;
     setPushStatus('pushing');
-    
-    const backendUrl = '';
+
     const token = localStorage.getItem('mosaic_token');
     const configPayload = {
       mosaicId,
@@ -377,16 +375,16 @@ export default function AdminDashboard({
     };
 
     try {
-      const res = await fetch(`${backendUrl}/api/superadmin/config`, {
+      const res = await fetch(`${BACKEND_URL}/api/superadmin/config`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(configPayload),
         credentials: 'include'
       });
-      
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Failed to save config');
@@ -396,7 +394,7 @@ export default function AdminDashboard({
       if (pushToastTimer.current) clearTimeout(pushToastTimer.current);
       pushToastTimer.current = setTimeout(() => setPushStatus('idle'), 3000);
     } catch (err) {
-      console.error('Config push error:', err);
+      console.error('Save settings error:', err);
       setPushStatus('error');
       if (pushToastTimer.current) clearTimeout(pushToastTimer.current);
       pushToastTimer.current = setTimeout(() => setPushStatus('idle'), 5000);
@@ -416,11 +414,9 @@ export default function AdminDashboard({
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-50 font-sans overflow-hidden">
-      {/* ── SIDEBAR ── */}
       <aside
         className={`relative flex-shrink-0 flex flex-col bg-slate-900/60 backdrop-blur-xl border-r border-slate-800/60 transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}
       >
-        {/* Sidebar header */}
         <div className="flex items-center justify-between px-5 py-6 border-b border-slate-800/60">
           {!sidebarCollapsed && (
             <div className="min-w-0">
@@ -438,7 +434,6 @@ export default function AdminDashboard({
           </button>
         </div>
 
-        {/* Nav items */}
         <nav className="flex flex-col gap-1 p-3 flex-1">
           {navItems.map((item) => (
             <button
@@ -456,7 +451,6 @@ export default function AdminDashboard({
           ))}
         </nav>
 
-        {/* Connection badge */}
         <div className={`px-4 py-3 border-t border-slate-800/60 flex items-center gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`}>
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${connected ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-rose-500'}`} />
           {!sidebarCollapsed && (
@@ -466,16 +460,14 @@ export default function AdminDashboard({
           )}
         </div>
 
-        {/* Logout */}
         <div className={`px-3 pb-4 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
           <button
             onClick={async () => {
-              const backendUrl = '';
               const token = localStorage.getItem('mosaic_token');
-              await fetch(`${backendUrl}/api/auth/logout`, { 
-                method: 'POST', 
+              await fetch(`${BACKEND_URL}/api/auth/logout`, {
+                method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
-                credentials: 'include' 
+                credentials: 'include'
               });
               localStorage.removeItem('mosaic_token');
               document.cookie = "mosaic_jwt=; Path=/; Max-Age=0";
@@ -490,9 +482,7 @@ export default function AdminDashboard({
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ── */}
       <main className="flex-1 overflow-y-auto">
-        {/* Top bar */}
         <header className="sticky top-0 z-20 flex items-center justify-between px-8 py-4 bg-slate-950/80 backdrop-blur-lg border-b border-slate-800/60">
           <div>
             <h2 className="text-2xl font-black tracking-tight capitalize text-white">
@@ -513,33 +503,31 @@ export default function AdminDashboard({
             )}
             {pushStatus === 'success' && (
               <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl">
-                <Check className="w-3.5 h-3.5" /> Pushed!
+                <Check className="w-3.5 h-3.5" /> Saved!
               </span>
             )}
             {pushStatus === 'error' && (
               <span className="flex items-center gap-1.5 text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl">
-                <X className="w-3.5 h-3.5" /> Push failed
+                <X className="w-3.5 h-3.5" /> Save failed
               </span>
             )}
             <button
-              onClick={pushConfig}
-              disabled={pushStatus === 'pushing' || !connected}
+              onClick={saveSettings}
+              disabled={pushStatus === 'pushing'}
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5)] transition-all hover:-translate-y-0.5"
             >
               {pushStatus === 'pushing'
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Pushing...</>
-                : <><MonitorPlay className="w-4 h-4" /> Push to Display</>}
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                : <><Save className="w-4 h-4" /> Save Settings</>}
             </button>
           </div>
         </header>
 
         <div className="p-8 space-y-8">
 
-          {/* ── OVERVIEW ── */}
           {activeSection === 'overview' && (
             <>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {/* Tiles placed */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 flex items-center gap-5">
                 <div className="p-3 rounded-xl shrink-0" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa' }}>
                   <LayoutGrid className="w-6 h-6" />
@@ -553,7 +541,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Grid Size */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 flex items-center gap-5">
                 <div className="p-3 rounded-xl shrink-0" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8' }}>
                   <Sliders className="w-6 h-6" />
@@ -564,7 +551,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Fill % */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 flex items-center gap-5">
                 <div className="p-3 rounded-xl shrink-0" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24' }}>
                   <Shield className="w-6 h-6" />
@@ -576,7 +562,6 @@ export default function AdminDashboard({
                       ? Math.round((totalApproved / (grid.width * grid.height)) * 100)
                       : 0}%
                   </p>
-                  {/* Progress bar */}
                   <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2">
                     <div
                       className="bg-amber-500 h-1.5 rounded-full transition-all duration-700"
@@ -586,7 +571,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Animation */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 flex items-center gap-5">
                 <div className="p-3 rounded-xl shrink-0" style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', color: '#c084fc' }}>
                   <Zap className="w-6 h-6" />
@@ -597,7 +581,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Background */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 flex items-center gap-5">
                 <div className="p-3 rounded-xl shrink-0" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34d399' }}>
                   <ImageIcon className="w-6 h-6" />
@@ -610,7 +593,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Socket Status */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 flex items-center gap-5">
                 <div className="p-3 rounded-xl shrink-0" style={connected ? { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34d399' } : { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
                   <Activity className="w-6 h-6" />
@@ -624,7 +606,6 @@ export default function AdminDashboard({
               </div>
             </div>
 
-            {/* Share Links */}
             <div className="col-span-full bg-slate-900/40 backdrop-blur-lg border border-indigo-500/20 rounded-2xl p-6 mt-2">
               <h3 className="text-sm font-black text-slate-200 flex items-center gap-2 mb-4">
                 <Link2 className="w-4 h-4 text-indigo-400" /> Shareable Links
@@ -646,11 +627,9 @@ export default function AdminDashboard({
             </>
           )}
 
-          {/* ── LIVE CONTROLS ── */}
           {activeSection === 'controls' && (
             <div className="space-y-6 max-w-3xl">
 
-              {/* Row 1: basic controls */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
                   onClick={() => socket?.send(JSON.stringify({ type: 'admin:trigger_animation', payload: { type: 'celebration', mosaicId } }))}
@@ -672,7 +651,7 @@ export default function AdminDashboard({
                 </button>
                 <button
                   onClick={handleClearMosaic}
-                  disabled={clearStatus === 'clearing' || !connected}
+                  disabled={clearStatus === 'clearing'}
                   className="col-span-full flex items-center justify-center gap-3 py-4 bg-slate-800/50 hover:bg-orange-500/10 text-slate-300 hover:text-orange-400 border border-slate-700/50 hover:border-orange-500/40 rounded-2xl font-bold text-sm transition-all"
                 >
                   {clearStatus === 'clearing' ? <Loader2 className="w-5 h-5 animate-spin" /> : <X className="w-5 h-5" />}
@@ -680,7 +659,6 @@ export default function AdminDashboard({
                 </button>
               </div>
 
-              {/* Random Fill panel */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 space-y-4">
                 <div>
                   <h3 className="text-base font-black text-slate-200 flex items-center gap-2">
@@ -698,7 +676,7 @@ export default function AdminDashboard({
                   )}
                   <button
                     onClick={handleRandomFill}
-                    disabled={fillStatus === 'filling' || !connected}
+                    disabled={fillStatus === 'filling'}
                     className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all"
                   >
                     {fillStatus === 'filling'
@@ -708,7 +686,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Bulk Upload panel */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 space-y-4">
                 <div>
                   <h3 className="text-base font-black text-slate-200 flex items-center gap-2">
@@ -719,7 +696,6 @@ export default function AdminDashboard({
                   </p>
                 </div>
 
-                {/* File picker */}
                 <div
                   onClick={() => bulkInputRef.current?.click()}
                   className={`relative w-full py-8 border-2 border-dashed rounded-xl cursor-pointer transition-all text-center ${bulkFiles.length > 0 ? 'border-indigo-500/40 bg-indigo-500/5' : 'border-slate-700 hover:border-indigo-500/40 hover:bg-slate-900'}`}
@@ -746,7 +722,6 @@ export default function AdminDashboard({
                   />
                 </div>
 
-                {/* Selected file chips */}
                 {bulkFiles.length > 0 && (
                   <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
                     {bulkFiles.map((f, i) => (
@@ -757,7 +732,6 @@ export default function AdminDashboard({
                   </div>
                 )}
 
-                {/* Progress / error */}
                 {bulkProgress && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs font-bold text-slate-400">
@@ -802,13 +776,11 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ── GRID SETUP ── */}
           {activeSection === 'grid' && (
             <div className="max-w-2xl space-y-8">
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-8 space-y-8">
                 <h3 className="text-lg font-bold text-slate-200">Grid Dimensions</h3>
 
-                {/* Custom width / height */}
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Columns (Width)</label>
@@ -838,13 +810,11 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Total tiles indicator */}
                 <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex justify-between items-center">
                   <span className="text-sm font-semibold text-slate-400">Total Tiles</span>
                   <span className="text-2xl font-black text-indigo-400">{grid.width * grid.height}</span>
                 </div>
 
-                {/* Quick presets */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Quick Presets</label>
                   <div className="grid grid-cols-3 gap-3">
@@ -871,7 +841,6 @@ export default function AdminDashboard({
                 <hr className="border-slate-800/60" />
                 <h3 className="text-lg font-bold text-slate-200">Visual Styling</h3>
 
-                {/* Gap size */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Tile Gap</label>
@@ -882,7 +851,6 @@ export default function AdminDashboard({
                     className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
                 </div>
 
-                {/* Border radius */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Tile Rounding</label>
@@ -896,7 +864,6 @@ export default function AdminDashboard({
                 <hr className="border-slate-800/60" />
                 <h3 className="text-lg font-bold text-slate-200">Animations</h3>
 
-                {/* Animation type */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Entry Animation</label>
                   <div className="grid grid-cols-3 gap-3">
@@ -910,7 +877,6 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Animation speed */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Animation Speed</label>
@@ -924,13 +890,11 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ── BACKGROUND ── */}
           {activeSection === 'background' && (
             <div className="max-w-2xl space-y-8">
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-8 space-y-6">
                 <h3 className="text-lg font-bold text-slate-200">Background Image</h3>
 
-                {/* Upload zone */}
                 <div
                   onClick={() => bgFileRef.current?.click()}
                   className={`relative w-full aspect-video rounded-2xl border-2 border-dashed cursor-pointer overflow-hidden group transition-all ${bgPreview ? 'border-transparent shadow-2xl' : 'border-slate-700 bg-slate-950/50 hover:border-indigo-500/50 hover:bg-slate-900'}`}
@@ -965,7 +929,6 @@ export default function AdminDashboard({
                   <input ref={bgFileRef} type="file" accept="image/*" className="hidden" onChange={handleBgFile} />
                 </div>
 
-                {/* Opacity control */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Background Opacity (behind tiles)</label>
@@ -979,14 +942,13 @@ export default function AdminDashboard({
                 {bgPreview && (
                   <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3">
                     <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                    <p className="text-sm text-emerald-300 font-semibold">Background image loaded. Hit <span className="text-white font-bold">&quot;Push to Display&quot;</span> to apply to the live wall.</p>
+                    <p className="text-sm text-emerald-300 font-semibold">Background image loaded. Hit <span className="text-white font-bold">&quot;Save Settings&quot;</span> to apply it permanently.</p>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* ── MODERATION / LIVE FEED ── */}
           {activeSection === 'moderation' && (
             <div className="max-w-2xl space-y-4">
               <div className="flex items-center justify-between mb-2">
@@ -1026,7 +988,6 @@ export default function AdminDashboard({
               )}
             </div>
           )}
-          {/* ── PRIZE BOX ── */}
           {activeSection === 'prizebox' && (
             <div className="space-y-6 max-w-4xl">
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 space-y-5">
@@ -1052,7 +1013,7 @@ export default function AdminDashboard({
                     )}
                     <button
                       onClick={savePrizeCells}
-                      disabled={prizeStatus === 'saving' || !connected}
+                      disabled={prizeStatus === 'saving'}
                       className="flex items-center gap-2 px-5 py-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black rounded-xl font-black text-sm transition-all"
                     >
                       {prizeStatus === 'saving' ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
@@ -1089,7 +1050,6 @@ export default function AdminDashboard({
               </div>
             </div>
           )}
-          {/* ── ANALYTICS & EXPORT ── */}
           {activeSection === 'analytics' && (
             <div className="space-y-6 max-w-4xl">
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-8 space-y-6">
@@ -1103,7 +1063,6 @@ export default function AdminDashboard({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* CSV Export Card */}
                   <div className="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-6 space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-indigo-500/10 rounded-xl text-indigo-400">
@@ -1119,9 +1078,8 @@ export default function AdminDashboard({
                     </p>
                     <button
                       onClick={() => {
-                        const backend = '';
                         const token = localStorage.getItem('mosaic_token');
-                        window.open(`${backend}/api/admin/export-csv?mosaicId=${mosaicId}&token=${token}`, '_blank');
+                        window.open(`${BACKEND_URL}/api/admin/export-csv?mosaicId=${mosaicId}&token=${token}`, '_blank');
                       }}
                       className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition-all"
                     >
@@ -1129,7 +1087,6 @@ export default function AdminDashboard({
                     </button>
                   </div>
 
-                  {/* Photo Archive Placeholder/Info */}
                   <div className="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-6 space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-purple-500/10 rounded-xl text-purple-400">
@@ -1149,7 +1106,6 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Integration Tips */}
                 <div className="p-5 bg-blue-500/5 border border-blue-500/20 rounded-2xl flex gap-4">
                   <div className="mt-1">
                     <Zap className="w-5 h-5 text-blue-400" />
@@ -1165,11 +1121,9 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ── PHYSICAL MOSAIC ── */}
           {activeSection === 'physical' && (
             <div className="space-y-6 max-w-3xl">
 
-              {/* How it works strip */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6">
                 <h3 className="text-base font-black text-slate-200 flex items-center gap-2 mb-4">
                   <Printer className="w-5 h-5 text-indigo-400" /> How Physical Mosaic Works
@@ -1189,7 +1143,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Sticker Sheet card */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 space-y-4">
                 <div>
                   <h3 className="text-base font-black text-slate-200 flex items-center gap-2">
@@ -1221,7 +1174,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Backdrop Template card */}
               <div className="bg-slate-900/40 backdrop-blur-lg border border-slate-800/60 rounded-2xl p-6 space-y-4">
                 <div>
                   <h3 className="text-base font-black text-slate-200 flex items-center gap-2">
@@ -1254,4 +1206,3 @@ export default function AdminDashboard({
     </div>
   );
 }
-
