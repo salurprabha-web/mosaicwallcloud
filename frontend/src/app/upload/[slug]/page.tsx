@@ -7,18 +7,20 @@ import { Loader2 } from 'lucide-react';
 
 const UploadForm = dynamic(() => import('@/components/UploadForm'), { ssr: false });
 
+// ✅ SAME bug as the display page — `const backend = '';` meant the
+// initial slug-to-mosaicId lookup was a broken relative path here too.
+const BACKEND_URL = 'https://mosaicwall.in';
+
 export default function UploadSlugPage() {
   const params = useParams();
   const slug = params?.slug as string;
   const [mosaicId, setMosaicId] = useState<string | null>(null);
   const [mosaicName, setMosaicName] = useState('Mosaic Wall');
   const [error, setError] = useState<string | null>(null);
-  const backend = '';
 
   useEffect(() => {
     if (!slug) return;
-    // Public endpoint — look up mosaic by slug
-    fetch(`${backend}/api/mosaic/${slug}`)
+    fetch(`${BACKEND_URL}/api/mosaic/${slug}`)
       .then(r => r.json())
       .then(data => {
         if (data.error) { setError('Event not found.'); return; }
@@ -26,7 +28,7 @@ export default function UploadSlugPage() {
         setMosaicName(data.name);
       })
       .catch(() => setError('Could not reach server.'));
-  }, [slug, backend]);
+  }, [slug]);
 
   if (error) return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950">
