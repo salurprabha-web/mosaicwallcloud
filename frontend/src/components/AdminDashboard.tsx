@@ -7,13 +7,22 @@ import {
   X, Check, Sliders, MonitorPlay, Home, Loader2, Gift, Star, Printer, LogOut, Link2, Copy, ExternalLink, DownloadCloud, Save
 } from 'lucide-react';
 
-// ✅ Single source of truth for the backend URL — fixes the repeated
-// `const backendUrl = '';` bug found in MANY functions throughout this
-// file. An empty string meant every fetch() call below was attempting
-// a bare relative path instead of reaching the real backend — this is
-// the root cause of Push to Display (and likely other actions) silently
-// failing to persist anything.
-const BACKEND_URL = 'https://mosaic-wall-backend.salurprabha.workers.dev';
+// ✅ SINGLE source of truth for the backend URL — fixes 11+ separate
+// `const backendUrl = '';` instances scattered throughout this file,
+// each one silently broken (empty string = bare relative path = never
+// reaches the real backend).
+//
+// ✅ ALSO FIXED: points to the CUSTOM DOMAIN (mosaicwall.in) rather
+// than the raw *.workers.dev subdomain. Direct curl testing confirmed
+// the workers.dev subdomain returns Cloudflare's own infrastructure
+// error 1042 ("Worker tried to fetch another Worker on the same
+// account/zone") — this happens at Cloudflare's edge, before your
+// Worker code even runs, and is unrelated to any CORS configuration.
+// Your wrangler.toml already has real custom domain routes bound
+// (mosaicwall.in/api/*, mosaicwall.in/uploads/*), so routing every
+// call through the custom domain avoids the same-account workers.dev
+// routing ambiguity entirely.
+const BACKEND_URL = 'https://mosaicwall.in';
 
 type PushStatus = 'idle' | 'pushing' | 'success' | 'error';
 type ClearStatus = 'idle' | 'clearing' | 'success' | 'error';
@@ -352,11 +361,10 @@ export default function AdminDashboard({
     }
   };
 
-  // ✅ RENAMED from pushConfig — same function, but now genuinely
-  // reflects what it does: permanently saves settings to the database.
-  // No longer depends on `connected` (WebSocket status) to be allowed
-  // to run — saving data should never be gated by a real-time broadcast
-  // connection being currently open, those are unrelated concerns.
+  // ✅ RENAMED from pushConfig — genuinely reflects what it does: a
+  // permanent save to the database. No longer requires `connected`
+  // (WebSocket status) — saving data is unrelated to whether a
+  // real-time broadcast connection happens to be open right now.
   const saveSettings = async () => {
     if (pushStatus === 'pushing') return;
     setPushStatus('pushing');
