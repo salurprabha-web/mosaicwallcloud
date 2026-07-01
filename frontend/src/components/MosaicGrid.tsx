@@ -207,6 +207,16 @@ export default function MosaicGrid({ mosaicId, mosaicSlug = 'default' }: { mosai
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const [config, setConfig] = useState<Config>(DEFAULT_CONFIG);
   const [ready, setReady] = useState(false);
+
+  // ✅ Reset display state when mosaicId changes (new connection)
+  useEffect(() => {
+    if (!mosaicId) return;
+    setReady(false);
+    setAllTiles(new Map());
+    setPlacedIds([]);
+    setQueue([]);
+    setSpotlightId(null);
+  }, [mosaicId]);
   const [prizeWinner, setPrizeWinner] = useState<{ tile: Tile; winner: string } | null>(null);
   const processingRef = useRef(false);
   const prizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -295,7 +305,10 @@ export default function MosaicGrid({ mosaicId, mosaicSlug = 'default' }: { mosai
       if (prizeTimer.current) clearTimeout(prizeTimer.current); 
       sock.close(); 
     };
-  }, []);
+  }, [mosaicId]);  // ✅ FIXED — mosaicId was missing from deps, so the WebSocket
+                    // opened before mosaicId was available, sending display:ready
+                    // with undefined mosaicId. Now reconnects once the real
+                    // mosaicId arrives from the parent page's async fetch.
 
   if (!ready) {
     return (
